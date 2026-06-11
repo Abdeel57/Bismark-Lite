@@ -1,0 +1,71 @@
+import { apiFetch, apiUpload } from '@/lib/api';
+import type {
+  PublicRiferoDTO,
+  PublicRaffleDTO,
+  TicketLiteDTO,
+  ValidationResultDTO,
+  DigitalTicketDTO,
+  PaymentProofDTO,
+  OrderStatus,
+} from '@bismark/shared';
+
+// Resultado de "Verificar boletos" (búsqueda por teléfono dentro de un rifero).
+export interface PublicOrderLookupItem {
+  code: string;
+  raffleTitle: string;
+  eventLabel: string;
+  eventNumber: number;
+  ticketNumbers: string[];
+  totalAmount: number;
+  status: OrderStatus;
+  paidAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  hasProof: boolean;
+  digitalTicketCode: string | null; // sólo presente si la orden está PAGADA
+}
+export interface PublicPaymentProfile {
+  holderName: string | null;
+  bank: string | null;
+  clabe: string | null;
+  cardNumber: string | null;
+  concept: string | null;
+  instructions: string | null;
+  whatsapp: string | null;
+}
+export interface PublicOrderLookupResult {
+  orders: PublicOrderLookupItem[];
+  paymentProfile: PublicPaymentProfile | null;
+}
+
+// Ganador publicado mostrado en el perfil del rifero (sin datos del comprador).
+export interface PublicRiferoWinner {
+  id: string;
+  raffleTitle: string;
+  eventLabel: string;
+  position: number;
+  ticketDisplayNumber: string;
+  prizeDescription: string | null;
+  evidenceUrl: string | null;
+}
+
+export const publicService = {
+  riferoBySubdomain: (subdomain: string) =>
+    apiFetch<{ active: boolean; rifero?: PublicRiferoDTO; publicName?: string; winners?: PublicRiferoWinner[] }>(
+      `/public/riferos/by-subdomain/${encodeURIComponent(subdomain)}`,
+    ),
+  raffleByEvent: (subdomain: string, eventNumber: number | string) =>
+    apiFetch<{ active: boolean; raffle?: PublicRaffleDTO }>(
+      `/public/raffles/by-event/${encodeURIComponent(subdomain)}/${eventNumber}`,
+    ),
+  raffleTickets: (raffleId: string) =>
+    apiFetch<{ items: TicketLiteDTO[] }>(`/public/raffles/${raffleId}/tickets`),
+  digitalTicket: (code: string) => apiFetch<{ ticket: DigitalTicketDTO }>(`/tickets/digital/${code}`),
+  validate: (code: string) => apiFetch<ValidationResultDTO>(`/validar/${code}`),
+  // El comprador sube su comprobante de pago (por folio de la orden).
+  uploadProof: (orderCode: string, file: File) =>
+    apiUpload<{ proof: PaymentProofDTO }>(`/public/orders/${encodeURIComponent(orderCode)}/proof`, file),
+  // El comprador busca SUS órdenes (apartadas/pagadas) por teléfono dentro del rifero.
+  lookupOrders: (slug: string, phone: string) =>
+    apiFetch<PublicOrderLookupResult>('/public/orders/lookup', { method: 'POST', body: { slug, phone } }),
+};

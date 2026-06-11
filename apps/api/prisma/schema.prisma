@@ -1,0 +1,492 @@
+// Bismark — Prisma schema
+// Plataforma SaaS multi-rifero. PostgreSQL.
+//
+// Convenciones:
+// - IDs: cuid()
+// - Timestamps: createdAt / updatedAt en cada modelo principal
+// - Soft delete: campo `status` (DELETED) o `deletedAt` donde aplica
+// - Dinero: enteros en centavos NO; usamos Decimal/Int en pesos. Precios en MXN como Int (pesos enteros).
+//   ticketPrice y montos se guardan como Int (pesos MXN). Para fracciones futuras, migrar a Decimal.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  VISITOR
+  RIFERO
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum RiferoStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  DELETED
+}
+
+enum PlanStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum RaffleStatus {
+  DRAFT // creada pero no publicada
+  PUBLISHED // visible públicamente (requiere plan activo)
+  FINISHED // sorteo realizado / cerrada
+  CANCELLED
+}
+
+enum TicketStatus {
+  AVAILABLE // disponible (verde)
+  RESERVED // apartado por comprador, esperando pago (amarillo)
+  PENDING_PAYMENT // comprobante en revisión
+  PAID // pagado (azul)
+  RIFERO_RESERVED // reservado manualmente por el rifero (negro)
+  CANCELLED // cancelado / liberado
+  WINNER // ganador (dorado/morado)
+}
+
+enum OrderStatus {
+  PENDING // creada, sin apartar aún
+  RESERVED // apartada (boletos bloqueados temporalmente)
+  PAID // pago confirmado por el rifero
+  REJECTED // pago rechazado
+  CANCELLED // cancelada por el rifero
+  EXPIRED // tiempo de apartado vencido
+}
+
+enum PaymentMethod {
+  TRANSFER
+  DEPOSIT
+  OTHER
+}
+
+enum PaymentProofStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ActivityType {
+  AUTH
+  RAFFLE
+  ORDER
+  TICKET
+  PAYMENT
+  SUBSCRIPTION
+  ADMIN
+  DRAW
+}
+
+// ─────────────────────────────────────────────────────────────
+// USERS & RIFERO PROFILE
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  phone        String?
+  passwordHash String
+  role         UserRole   @default(RIFERO)
+  status       UserStatus @default(ACTIVE)
+
+  riferoProfile RiferoProfile?
+  activityLogs  ActivityLog[]
+  drawsExecuted Winner[]       @relation("WinnerDrawnBy")
+  passwordResetTokens PasswordResetToken[]
+  pushSubscriptions   PushSubscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([status])
+}
+
+// Token de recuperación de contraseña. Se guarda HASHEADO (sha256); el valor en
+// claro sólo viaja en el enlace del correo. De un solo uso y con expiración.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Suscripción Web Push de un rifero (organizador). Solo organizadores reciben
+// avisos. Una fila por dispositivo/navegador (endpoint único).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model RiferoProfile {
+  id         String @id @default(cuid())
+  userId     String @unique
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  publicName String
+  slug       String  @unique // usado como subdominio: <slug>.bismark.com
+  subdomain  String  @unique // normalmente == slug; separado por flexibilidad futura
+  customDomain String? @unique // futuro: dominio propio
+
+  logoUrl     String?
+  coverUrl    String?
+  description String?
+
+  whatsapp  String?
+  facebook  String?
+  instagram String?
+  tiktok    String?
+
+  primaryColor   String  @default("#1d4ed8")
+  secondaryColor String  @default("#0f172a")
+  templateKey    String  @default("classic")
+  logoScale      Int     @default(100) // % del tamaño base del logo (50–250)
+  logoGlow       Boolean @default(false) // halo de color detrás del logo (útil para PNG transparentes)
+
+  // Configuración de pagos (instrucciones manuales del rifero)
+  payHolderName   String?
+  payBank         String?
+  payClabe        String?
+  payCardNumber   String?
+  payConcept      String?
+  payInstructions String?
+  payWhatsapp     String?
+
+  // Configuración operativa
+  defaultReserveMinutes Int     @default(120) // tiempo de apartado por defecto
+  allowProofUpload      Boolean @default(false) // depende del plan
+  showWinners           Boolean @default(true)
+  useDigitalDraw        Boolean @default(false)
+
+  status   RiferoStatus @default(PENDING)
+  verified Boolean      @default(false) // palomita azul (plan verificado)
+
+  subscriptions Subscription[]
+  raffles       Raffle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([slug])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLANS & SUBSCRIPTIONS
+// ─────────────────────────────────────────────────────────────
+
+model Plan {
+  id            String     @id @default(cuid())
+  name          String
+  slug          String     @unique
+  price         Int // MXN pesos enteros
+  currency      String     @default("MXN")
+  billingPeriod String     @default("monthly")
+
+  maxActiveRaffles      Int
+  maxTicketsPerRaffle   Int
+  allowProofUpload      Boolean @default(false)
+  allowMultipleWinners  Boolean @default(false)
+  allowReportsExcel     Boolean @default(false)
+  allowReportsPdf       Boolean @default(false)
+  allowVerificationBadge Boolean @default(false)
+  allowDigitalDraw      Boolean @default(false)
+  allowCustomDomainFuture Boolean @default(false)
+
+  features Json @default("[]") // string[] de features mostradas en la landing
+
+  status    PlanStatus @default(ACTIVE)
+  sortOrder Int        @default(0)
+
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Subscription {
+  id       String             @id @default(cuid())
+  riferoId String
+  rifero   RiferoProfile      @relation(fields: [riferoId], references: [id], onDelete: Cascade)
+  planId   String
+  plan     Plan               @relation(fields: [planId], references: [id])
+  status   SubscriptionStatus @default(PENDING)
+
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([riferoId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// RAFFLES & TICKETS
+// ─────────────────────────────────────────────────────────────
+
+model Raffle {
+  id          String       @id @default(cuid())
+  riferoId    String
+  rifero      RiferoProfile @relation(fields: [riferoId], references: [id], onDelete: Cascade)
+
+  eventNumber Int // consecutivo por rifero: 1, 2, 3 -> e1, e2, e3
+  title       String
+  slug        String
+  description String?
+  prize       String?
+
+  ticketPrice  Int // MXN
+  totalTickets Int
+  ticketFormat Int @default(3) // padding: 3 -> 001, 4 -> 0001, 5 -> 00001
+  ticketStart  Int @default(1)
+  ticketEnd    Int // ticketStart + totalTickets - 1
+  maxTicketsPerOrder Int? // opcional
+
+  startDate DateTime?
+  endDate   DateTime?
+  drawDate  DateTime?
+
+  status RaffleStatus @default(DRAFT)
+
+  terms               String?
+  paymentInstructions String?
+  reserveMinutes      Int     @default(120)
+
+  allowWinnerPublication Boolean @default(true)
+  useDigitalDraw         Boolean @default(false)
+
+  images  RaffleImage[]
+  tickets TicketNumber[]
+  orders  Order[]
+  winners Winner[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([riferoId, eventNumber])
+  @@index([riferoId])
+  @@index([status])
+}
+
+model RaffleImage {
+  id       String @id @default(cuid())
+  raffleId String
+  raffle   Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  url      String
+  sortOrder Int   @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([raffleId])
+}
+
+model TicketNumber {
+  id            String       @id @default(cuid())
+  raffleId      String
+  raffle        Raffle       @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  number        Int // valor numérico
+  displayNumber String // formateado: "001"
+  status        TicketStatus @default(AVAILABLE)
+
+  buyerId String?
+  buyer   Buyer?  @relation(fields: [buyerId], references: [id])
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  reservedUntil DateTime?
+  paidAt        DateTime?
+
+  orderTickets OrderTicket[]
+  winners      Winner[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([raffleId, number])
+  @@index([raffleId, status])
+  @@index([orderId])
+  @@index([buyerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// BUYERS & ORDERS
+// ─────────────────────────────────────────────────────────────
+
+model Buyer {
+  id       String  @id @default(cuid())
+  fullName String
+  phone    String
+  whatsapp String?
+  state    String?
+
+  orders  Order[]
+  tickets TicketNumber[]
+  winners Winner[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phone])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  code        String      @unique // folio legible: BSK-XXXX
+  raffleId    String
+  raffle      Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  buyerId     String
+  buyer       Buyer       @relation(fields: [buyerId], references: [id])
+  totalAmount Int
+  status      OrderStatus @default(RESERVED)
+
+  expiresAt DateTime?
+  paidAt    DateTime?
+
+  orderTickets  OrderTicket[]
+  tickets       TicketNumber[]
+  paymentProofs PaymentProof[]
+  digitalTicket DigitalTicket?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([raffleId, status])
+  @@index([buyerId])
+}
+
+model OrderTicket {
+  id       String       @id @default(cuid())
+  orderId  String
+  order    Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketId String
+  ticket   TicketNumber @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([orderId, ticketId])
+  @@index([ticketId])
+}
+
+model PaymentProof {
+  id       String             @id @default(cuid())
+  orderId  String
+  order    Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method   PaymentMethod      @default(TRANSFER)
+  fileUrl  String
+  note     String?
+  status   PaymentProofStatus @default(PENDING)
+
+  uploadedAt DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([orderId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// WINNERS & DIGITAL TICKETS
+// ─────────────────────────────────────────────────────────────
+
+model Winner {
+  id               String  @id @default(cuid())
+  raffleId         String
+  raffle           Raffle  @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  ticketId         String
+  ticket           TicketNumber @relation(fields: [ticketId], references: [id])
+  buyerId          String?
+  buyer            Buyer?  @relation(fields: [buyerId], references: [id])
+  position         Int // 1 = primer lugar
+  prizeDescription String?
+  published        Boolean @default(false)
+  evidenceUrl      String? // video/imagen del sorteo
+
+  drawnById String?
+  drawnBy   User?   @relation("WinnerDrawnBy", fields: [drawnById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([raffleId])
+}
+
+model DigitalTicket {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  code    String @unique // código de verificación público
+  pdfUrl  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([code])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLATFORM SETTINGS & ACTIVITY LOG
+// ─────────────────────────────────────────────────────────────
+
+model PlatformSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityLog {
+  id     String       @id @default(cuid())
+  userId String?
+  user   User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type   ActivityType
+  action String
+  meta   Json?
+  ip     String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}

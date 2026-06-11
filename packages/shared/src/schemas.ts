@@ -1,0 +1,205 @@
+import { z } from 'zod';
+import { SLUG_REGEX, RESERVED_SLUGS } from './constants.js';
+
+// ── Auth ────────────────────────────────────────────────────
+export const registerSchema = z
+  .object({
+    name: z.string().min(2, 'Nombre muy corto').max(120),
+    email: z.string().email('Correo inválido').toLowerCase(),
+    phone: z.string().min(10, 'Teléfono inválido').max(20),
+    password: z.string().min(8, 'Mínimo 8 caracteres').max(100),
+    confirmPassword: z.string(),
+    acceptTerms: z.literal(true, { errorMap: () => ({ message: 'Debes aceptar los términos' }) }),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().email().toLowerCase(),
+  password: z.string().min(1),
+});
+export type LoginInput = z.infer<typeof loginSchema>;
+
+// Recuperación de contraseña
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Correo inválido').toLowerCase(),
+});
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(10, 'Token inválido'),
+    password: z.string().min(8, 'Mínimo 8 caracteres').max(100),
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: 'Las contraseñas no coinciden',
+    path: ['confirmPassword'],
+  });
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+// ── Slug ────────────────────────────────────────────────────
+export const slugSchema = z
+  .string()
+  .min(3)
+  .max(32)
+  .regex(SLUG_REGEX, 'Solo letras, números y guiones (3-32)')
+  .refine((s) => !(RESERVED_SLUGS as readonly string[]).includes(s.toLowerCase()), {
+    message: 'Ese nombre está reservado, elige otro',
+  });
+
+// ── Onboarding ──────────────────────────────────────────────
+const hexColor = z.string().regex(/^#([0-9a-fA-F]{6})$/, 'Color hex inválido');
+
+// Imagen subida: acepta URL absoluta (https://… Cloudinary/S3) o ruta relativa
+// servida por la API (/uploads/… del volumen local). z.string().url() rechaza la
+// ruta relativa y por eso fallaba la creación de rifas con imagen.
+const imageUrl = z
+  .string()
+  .refine((v) => /^https?:\/\//i.test(v) || v.startsWith('/uploads/'), { message: 'Imagen inválida' });
+
+export const onboardingSchema = z.object({
+  // Sección 1: datos personales
+  fullName: z.string().min(2).max(120),
+  email: z.string().email().toLowerCase(),
+  phone: z.string().min(10).max(20),
+  // Sección 2: página de rifas
+  publicName: z.string().min(2, 'Nombre público requerido').max(80),
+  slug: slugSchema,
+  whatsapp: z.string().min(10).max(20),
+  description: z.string().max(600).optional().or(z.literal('')),
+  logoUrl: imageUrl.optional().or(z.literal('')),
+  coverUrl: imageUrl.optional().or(z.literal('')),
+  facebook: z.string().max(200).optional().or(z.literal('')),
+  instagram: z.string().max(200).optional().or(z.literal('')),
+  tiktok: z.string().max(200).optional().or(z.literal('')),
+  primaryColor: hexColor.optional(),
+  secondaryColor: hexColor.optional(),
+  templateKey: z.string().max(40).optional(),
+});
+export type OnboardingInput = z.infer<typeof onboardingSchema>;
+
+export const updateRiferoSchema = z.object({
+  publicName: z.string().min(2).max(80).optional(),
+  description: z.string().max(600).optional(),
+  whatsapp: z.string().min(10).max(20).optional(),
+  logoUrl: imageUrl.optional().or(z.literal('')),
+  coverUrl: imageUrl.optional().or(z.literal('')),
+  facebook: z.string().max(200).optional().or(z.literal('')),
+  instagram: z.string().max(200).optional().or(z.literal('')),
+  tiktok: z.string().max(200).optional().or(z.literal('')),
+  primaryColor: hexColor.optional(),
+  secondaryColor: hexColor.optional(),
+  templateKey: z.string().max(40).optional(),
+  logoScale: z.number().int().min(50).max(250).optional(), // % del tamaño base del logo
+  logoGlow: z.boolean().optional(), // halo de color detrás del logo
+  payHolderName: z.string().max(120).optional(),
+  payBank: z.string().max(80).optional(),
+  payClabe: z.string().max(40).optional(),
+  payCardNumber: z.string().max(40).optional(),
+  payConcept: z.string().max(120).optional(),
+  payInstructions: z.string().max(1000).optional(),
+  payWhatsapp: z.string().max(20).optional(),
+  defaultReserveMinutes: z.number().int().min(5).max(10080).optional(),
+  allowProofUpload: z.boolean().optional(),
+  showWinners: z.boolean().optional(),
+  useDigitalDraw: z.boolean().optional(),
+});
+export type UpdateRiferoInput = z.infer<typeof updateRiferoSchema>;
+
+// ── Raffles ─────────────────────────────────────────────────
+export const createRaffleSchema = z.object({
+  title: z.string().min(2, 'Título requerido').max(120),
+  // Permite HTML del mini editor (negritas, color, alineación). Saneado en el front.
+  description: z.string().max(8000).optional(),
+  prize: z.string().max(300).optional(),
+  ticketPrice: z.number().int().min(1, 'Precio inválido').max(1000000),
+  totalTickets: z.number().int().min(1).max(100000),
+  ticketFormat: z.number().int().min(2).max(6).default(3),
+  ticketStart: z.number().int().min(0).default(1),
+  maxTicketsPerOrder: z.number().int().min(1).max(10000).optional(),
+  startDate: z.string().datetime().optional().or(z.literal('')),
+  endDate: z.string().datetime().optional().or(z.literal('')),
+  drawDate: z.string().datetime().optional().or(z.literal('')),
+  terms: z.string().max(4000).optional(),
+  paymentInstructions: z.string().max(2000).optional(),
+  reserveMinutes: z.number().int().min(5).max(10080).optional(),
+  allowWinnerPublication: z.boolean().optional(),
+  useDigitalDraw: z.boolean().optional(),
+  images: z.array(imageUrl).max(8).optional(),
+});
+export type CreateRaffleInput = z.infer<typeof createRaffleSchema>;
+
+export const updateRaffleSchema = createRaffleSchema.partial();
+export type UpdateRaffleInput = z.infer<typeof updateRaffleSchema>;
+
+// ── Buyer / Reserva ─────────────────────────────────────────
+export const buyerSchema = z.object({
+  // 140 cubre nombres(60) + espacio + apellidos(60) del formulario público (máx. 121).
+  fullName: z.string().min(2, 'Nombre requerido').max(140),
+  phone: z.string().min(10, 'Teléfono inválido').max(20),
+  // whatsapp y state son opcionales; el formulario envía '' cuando no se llenan.
+  whatsapp: z.string().max(20).optional().or(z.literal('')),
+  state: z.string().max(60).optional().or(z.literal('')),
+});
+export type BuyerInput = z.infer<typeof buyerSchema>;
+
+export const reserveTicketsSchema = z.object({
+  buyer: buyerSchema,
+  ticketNumbers: z.array(z.number().int().nonnegative()).min(1, 'Selecciona al menos un boleto').max(10000),
+});
+export type ReserveTicketsInput = z.infer<typeof reserveTicketsSchema>;
+
+export const reserveManualSchema = z.object({
+  ticketNumbers: z.array(z.number().int().nonnegative()).min(1).max(10000),
+  note: z.string().max(200).optional(),
+});
+
+// ── Draw / Winners ──────────────────────────────────────────
+export const drawSchema = z.object({
+  prizes: z
+    .array(
+      z.object({
+        position: z.number().int().min(1).max(100),
+        prizeDescription: z.string().max(300).optional(),
+      }),
+    )
+    .min(1, 'Define al menos un premio')
+    .max(100),
+  allowRepeatWinner: z.boolean().optional().default(false),
+});
+export type DrawInput = z.infer<typeof drawSchema>;
+
+// ── Plans (admin) ───────────────────────────────────────────
+export const planSchema = z.object({
+  name: z.string().min(2).max(80),
+  slug: z.string().min(2).max(40),
+  price: z.number().int().min(0),
+  currency: z.string().default('MXN'),
+  billingPeriod: z.string().default('monthly'),
+  maxActiveRaffles: z.number().int().min(0),
+  maxTicketsPerRaffle: z.number().int().min(0),
+  allowProofUpload: z.boolean().default(false),
+  allowMultipleWinners: z.boolean().default(false),
+  allowReportsExcel: z.boolean().default(false),
+  allowReportsPdf: z.boolean().default(false),
+  allowVerificationBadge: z.boolean().default(false),
+  allowDigitalDraw: z.boolean().default(false),
+  allowCustomDomainFuture: z.boolean().default(false),
+  features: z.array(z.string()).default([]),
+  sortOrder: z.number().int().default(0),
+});
+export type PlanInput = z.infer<typeof planSchema>;
+
+export const updatePlanSchema = planSchema.partial();
+
+// ── Subscriptions (admin) ───────────────────────────────────
+export const activateSubscriptionSchema = z.object({
+  riferoId: z.string().min(1),
+  planId: z.string().min(1),
+  months: z.number().int().min(1).max(36).default(1),
+});
+export type ActivateSubscriptionInput = z.infer<typeof activateSubscriptionSchema>;

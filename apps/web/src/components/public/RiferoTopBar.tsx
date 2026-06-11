@@ -1,0 +1,69 @@
+import { apiAssetUrl } from '@/lib/api';
+import { VerifiedBadge } from '@/components/brand/VerifiedBadge';
+
+// Barra superior con la marca del rifero (fondo oscuro + bordes del color del
+// rifero, logo centrado) y los dos accesos: "Métodos de pago" y "Sube tu pago
+// aquí". Los `href` anclan a las secciones (#metodos-de-pago / #sube-tu-pago).
+// Los colores vienen de las variables CSS que aplica <RiferoTheme>.
+export function RiferoTopBar({
+  logoUrl,
+  publicName,
+  verified = false,
+  logoGlow = false,
+  leftHref = '#metodos-de-pago',
+  rightHref = '#sube-tu-pago',
+}: {
+  logoUrl: string | null;
+  publicName: string;
+  verified?: boolean;
+  logoGlow?: boolean;
+  leftHref?: string;
+  rightHref?: string;
+}) {
+  const LOGO = 48;
+  const linkClass =
+    'flex-1 px-1 text-center text-xs font-extrabold uppercase leading-tight tracking-wide text-white transition-opacity hover:opacity-90 sm:text-sm';
+  const glow = { textShadow: '0 0 5px var(--rifero-primary), 0 0 11px var(--rifero-primary)' };
+
+  return (
+    <div className="sticky top-0 z-50 border-y-[8px] border-[var(--rifero-primary,#2751fb)] bg-zinc-950/95 text-white backdrop-blur safe-top">
+      <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-3" style={{ height: 56 }}>
+        <a href={leftHref} className={linkClass} style={glow}>
+          Métodos
+          <br />
+          de pago
+        </a>
+
+        <div className="relative shrink-0" style={{ width: LOGO, height: LOGO }}>
+          {logoUrl ? (
+            <img
+              src={apiAssetUrl(logoUrl)}
+              alt={publicName}
+              className="h-full w-full object-contain"
+              style={{
+                filter: logoGlow
+                  ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.35)) drop-shadow(0 0 1.5px color-mix(in srgb, var(--rifero-primary) 30%, transparent))'
+                  : 'drop-shadow(0 2px 3px rgba(0,0,0,0.3))',
+              }}
+            />
+          ) : (
+            <div className="grid h-full w-full place-items-center rounded-full border-2 border-white bg-[var(--rifero-primary,#2751fb)] text-xl font-black text-white">
+              {publicName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {verified && (
+            <span className="absolute -right-1 -top-1 grid place-items-center rounded-full bg-white p-0.5 shadow">
+              <VerifiedBadge size={15} />
+            </span>
+          )}
+        </div>
+
+        <a href={rightHref} className={linkClass} style={glow}>
+          Sube tu
+          <br />
+          pago aquí
+        </a>
+      </div>
+    </div>
+  );
+}

@@ -322,7 +322,13 @@ export default function Payments() {
         </CardContent>
       </Card>
 
-      <div className="sticky bottom-24 z-10">
+      {/* Barra de guardar sticky, pegada al fondo del área de scroll del panel. */}
+      <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+        {dirty && (
+          <p className="mb-2 text-center text-xs font-semibold text-amber-600 dark:text-amber-400">
+            Tienes cambios sin guardar
+          </p>
+        )}
         <Button
           type="button"
           size="lg"

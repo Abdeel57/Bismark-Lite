@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, ListPlus, User, Hash } from 'lucide-react';
+import { ListPlus, User, Hash } from 'lucide-react';
 import {
   TICKET_STATUS_LABELS,
   type TicketLiteDTO,
@@ -52,7 +52,6 @@ function parseTicketNumbers(input: string): number[] {
 export default function RaffleTickets() {
   const { id } = useParams<{ id: string }>();
   const raffleId = id as string;
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [selected, setSelected] = useState<OwnerTicketDTO | null>(null);
@@ -150,18 +149,10 @@ export default function RaffleTickets() {
 
   return (
     <div>
+      {/* El regreso vive en el header del panel (flecha "atrás"). */}
       <PageHeader
         title="Boletos"
         description={`${raffle.eventLabel} · ${raffle.title}`}
-        back={
-          <button
-            type="button"
-            onClick={() => navigate('/panel/admin/rifas')}
-            className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </button>
-        }
         action={
           <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}>
             <ListPlus className="h-4 w-4" />

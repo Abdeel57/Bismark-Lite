@@ -1,13 +1,16 @@
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Receipt, Ticket, Menu, type LucideIcon } from 'lucide-react';
+import { ArrowLeft, Eye, Home, Receipt, Ticket, Menu, type LucideIcon } from 'lucide-react';
 import { PageLoader } from '@/components/ui/misc';
 import { cn } from '@/lib/cn';
 import { useNotificationsSummary } from '@/lib/pwa/useNotificationsSummary';
-import { MoreMenu } from './MoreMenu';
 
 function sectionTitle(pathname: string): string {
   if (pathname.startsWith('/panel/admin/ordenes')) return 'Órdenes';
+  if (pathname.startsWith('/panel/admin/rifas/nueva')) return 'Nueva rifa';
+  if (/^\/panel\/admin\/rifas\/[^/]+\/editar/.test(pathname)) return 'Editar rifa';
+  if (/^\/panel\/admin\/rifas\/[^/]+\/boletos/.test(pathname)) return 'Boletos';
+  if (/^\/panel\/admin\/rifas\/[^/]+\/sorteo/.test(pathname)) return 'Sorteo';
   if (pathname.startsWith('/panel/admin/rifas')) return 'Rifas';
   if (pathname.startsWith('/panel/admin/diseno')) return 'Apariencia';
   if (pathname.startsWith('/panel/admin/perfil')) return 'Perfil';
@@ -15,8 +18,24 @@ function sectionTitle(pathname: string): string {
   if (pathname.startsWith('/panel/admin/reportes')) return 'Reportes';
   if (pathname.startsWith('/panel/admin/plan')) return 'Mi plan';
   if (pathname.startsWith('/panel/admin/configuracion')) return 'Ajustes';
+  if (pathname.startsWith('/panel/admin/mas')) return 'Más';
   if (pathname.startsWith('/panel/admin/inicio')) return 'Inicio';
   return 'Administrador';
+}
+
+// Sub-pantallas que no viven en el menú inferior: el header muestra "atrás"
+// hacia su pantalla padre para que la jerarquía sea obvia en móvil.
+function backTarget(pathname: string): string | null {
+  if (
+    pathname.startsWith('/panel/admin/rifas/nueva') ||
+    /^\/panel\/admin\/rifas\/[^/]+\/(editar|boletos|sorteo)/.test(pathname)
+  ) {
+    return '/panel/admin/rifas';
+  }
+  // Secciones del menú "Más": atrás regresa al hub.
+  const fromMore = ['diseno', 'perfil', 'pagos', 'reportes', 'plan', 'configuracion'];
+  if (fromMore.some((s) => pathname.startsWith(`/panel/admin/${s}`))) return '/panel/admin/mas';
+  return null;
 }
 
 function Tab({
@@ -36,7 +55,7 @@ function Tab({
     <button
       type="button"
       onClick={onClick}
-      className="group relative flex flex-1 flex-col items-center justify-center gap-1"
+      className="group relative flex min-h-[56px] flex-1 flex-col items-center justify-center gap-1"
       aria-current={active ? 'page' : undefined}
     >
       <span className={cn('absolute top-0 h-[3px] w-9 rounded-full transition-colors', active ? 'bg-brand' : 'bg-transparent')} />
@@ -62,14 +81,15 @@ export function AdminDrawer() {
   const navigate = useNavigate();
   const location = useLocation();
   const { total: pendingTotal } = useNotificationsSummary();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const close = () => navigate('/panel');
+  const viewMyPage = () => navigate('/panel');
+  const back = backTarget(location.pathname);
 
-  // Cerrar con Escape + bloquear scroll del fondo.
+  // Cerrar con Escape (escritorio) + bloquear scroll del fondo.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') navigate('/panel');
     };
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -80,61 +100,65 @@ export function AdminDrawer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Al cambiar de pantalla, empezar arriba (evita aterrizar a media lista).
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [location.pathname]);
+
   const onInicio = location.pathname.startsWith('/panel/admin/inicio');
   const onOrdenes = location.pathname.startsWith('/panel/admin/ordenes');
   const onRifas = location.pathname.startsWith('/panel/admin/rifas');
-  const inicioActive = !moreOpen && onInicio;
-  const ordenesActive = !moreOpen && onOrdenes;
-  const rifasActive = !moreOpen && onRifas;
-  const masActive = moreOpen || (!onInicio && !onOrdenes && !onRifas);
-
-  const goTab = (to: string) => {
-    setMoreOpen(false);
-    navigate(to);
-  };
+  const masActive = !onInicio && !onOrdenes && !onRifas;
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop (desktop): deja ver la página detrás, click cierra */}
+      {/* Backdrop (escritorio): deja ver la página detrás, click cierra */}
       <button
         aria-label="Cerrar administrador"
-        onClick={close}
+        onClick={viewMyPage}
         className="hidden flex-1 animate-fade-in-fast cursor-default bg-black/40 backdrop-blur-[2px] lg:block"
       />
 
-      {/* Panel */}
+      {/* Panel: pantalla completa en móvil, drawer lateral en escritorio */}
       <aside className="flex h-full w-full animate-slide-in-right flex-col border-l bg-background shadow-2xl sm:max-w-lg lg:max-w-xl">
-        {/* Barra superior: título de sección + cerrar */}
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b px-5 py-4 safe-top">
-          <h2 className="truncate font-display text-xl font-extrabold tracking-tight">
-            {moreOpen ? 'Más' : sectionTitle(location.pathname)}
+        {/* Barra superior: atrás contextual + título + ver mi página */}
+        <header className="flex shrink-0 items-center gap-1.5 border-b px-3 py-2.5 safe-top sm:px-4">
+          {back && (
+            <button
+              type="button"
+              onClick={() => navigate(back)}
+              aria-label="Atrás"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:bg-accent"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+          <h2 className={cn('min-w-0 flex-1 truncate font-display text-xl font-extrabold tracking-tight', !back && 'pl-2')}>
+            {sectionTitle(location.pathname)}
           </h2>
           <button
             type="button"
-            onClick={close}
-            className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            onClick={viewMyPage}
+            className="flex h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:bg-accent"
           >
-            Cerrar
+            <Eye className="h-[18px] w-[18px]" />
+            Mi página
           </button>
         </header>
 
         {/* Contenido */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          {moreOpen ? (
-            <MoreMenu onPick={goTab} />
-          ) : (
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
-          )}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 pb-8 pt-5 sm:px-5">
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </div>
 
-        {/* Menú inferior: 4 pestañas (único lugar con iconos) */}
-        <nav className="flex h-16 shrink-0 items-stretch border-t bg-background/95 backdrop-blur safe-bottom">
-          <Tab label="Inicio" icon={Home} active={inicioActive} onClick={() => goTab('/panel/admin/inicio')} />
-          <Tab label="Órdenes" icon={Receipt} active={ordenesActive} badge={pendingTotal} onClick={() => goTab('/panel/admin/ordenes')} />
-          <Tab label="Rifas" icon={Ticket} active={rifasActive} onClick={() => goTab('/panel/admin/rifas')} />
-          <Tab label="Más" icon={Menu} active={masActive} onClick={() => setMoreOpen(true)} />
+        {/* Menú inferior: 4 pestañas (rutas reales; el botón atrás del teléfono funciona) */}
+        <nav className="flex shrink-0 items-stretch border-t bg-background/95 backdrop-blur safe-bottom">
+          <Tab label="Inicio" icon={Home} active={onInicio} onClick={() => navigate('/panel/admin/inicio')} />
+          <Tab label="Órdenes" icon={Receipt} active={onOrdenes} badge={pendingTotal} onClick={() => navigate('/panel/admin/ordenes')} />
+          <Tab label="Rifas" icon={Ticket} active={onRifas} onClick={() => navigate('/panel/admin/rifas')} />
+          <Tab label="Más" icon={Menu} active={masActive} onClick={() => navigate('/panel/admin/mas')} />
         </nav>
       </aside>
     </div>

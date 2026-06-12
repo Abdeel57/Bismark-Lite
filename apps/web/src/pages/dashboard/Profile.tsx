@@ -208,16 +208,24 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        <Button
-          type="submit"
-          size="lg"
-          variant="brand"
-          className="w-full"
-          loading={mutation.isPending}
-          disabled={!isDirty || mutation.isPending}
-        >
-          Guardar cambios
-        </Button>
+        {/* Barra de guardar sticky: visible apenas hay cambios. */}
+        <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+          {isDirty && (
+            <p className="mb-2 text-center text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Tienes cambios sin guardar
+            </p>
+          )}
+          <Button
+            type="submit"
+            size="lg"
+            variant="brand"
+            className="w-full"
+            loading={mutation.isPending}
+            disabled={!isDirty || mutation.isPending}
+          >
+            Guardar cambios
+          </Button>
+        </div>
       </form>
     </div>
   );

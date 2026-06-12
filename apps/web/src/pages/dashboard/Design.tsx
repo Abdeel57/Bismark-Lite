@@ -33,7 +33,7 @@ interface DesignState {
   logoGlow: boolean;
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved';
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 function ImageUploader({
   label,
@@ -114,7 +114,10 @@ function ImageUploader({
 
 export default function Design() {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['rifero', 'me'], queryFn: () => riferoService.me() });
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['rifero', 'me'],
+    queryFn: () => riferoService.me(),
+  });
   const profile = data?.profile;
 
   const [state, setState] = useState<DesignState>({
@@ -131,6 +134,8 @@ export default function Design() {
   const initRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
   const savedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  // Último estado aún no confirmado por el servidor (debounce en curso o error).
+  const pendingRef = useRef<DesignState | null>(null);
 
   useEffect(() => {
     if (profile && !initRef.current) {
@@ -149,8 +154,9 @@ export default function Design() {
   }, [profile]);
 
   // Guarda y actualiza la caché (la vista previa detrás se actualiza al instante).
-  const save = async (next: DesignState) => {
-    setStatus('saving');
+  // `silent` se usa en el flush de salida: el componente ya no está en pantalla.
+  const save = async (next: DesignState, silent = false) => {
+    if (!silent) setStatus('saving');
     try {
       const res = await riferoService.update({
         publicName: next.publicName || undefined,
@@ -163,12 +169,17 @@ export default function Design() {
         logoGlow: next.logoGlow,
       });
       queryClient.setQueryData(['rifero', 'me'], res);
-      setStatus('saved');
-      clearTimeout(savedTimerRef.current);
-      savedTimerRef.current = setTimeout(() => setStatus('idle'), 1800);
+      pendingRef.current = null;
+      if (!silent) {
+        setStatus('saved');
+        clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setStatus('idle'), 1800);
+      }
     } catch (e) {
-      setStatus('idle');
-      toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar');
+      if (!silent) {
+        setStatus('error');
+        toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar. Revisa tu conexión.');
+      }
     }
   };
 
@@ -176,6 +187,7 @@ export default function Design() {
   const update = (patch: Partial<DesignState>) => {
     setState((prev) => {
       const next = { ...prev, ...patch };
+      pendingRef.current = next;
       setStatus('saving');
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void save(next), 700);
@@ -183,26 +195,61 @@ export default function Design() {
     });
   };
 
+  const retry = () => {
+    if (pendingRef.current) void save(pendingRef.current);
+  };
+
+  // Al salir de la pantalla con un guardado pendiente, dispararlo de inmediato
+  // (antes el cleanup cancelaba el debounce y los últimos cambios se perdían).
   useEffect(
     () => () => {
       clearTimeout(timerRef.current);
       clearTimeout(savedTimerRef.current);
+      if (pendingRef.current) void save(pendingRef.current, true);
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
+  // Si cierran o recargan la pestaña con cambios sin confirmar, avisar.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (pendingRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
   if (isLoading) return <PageLoader label="Cargando apariencia..." />;
+
+  if (isError && !profile) {
+    return (
+      <div className="grid place-items-center py-16 text-center">
+        <div>
+          <p className="font-semibold">No pudimos cargar tu apariencia</p>
+          <p className="mt-1 text-sm text-muted-foreground">Revisa tu conexión e inténtalo de nuevo.</p>
+          <Button className="mt-4" loading={isFetching} onClick={() => void refetch()}>
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const publicName = state.publicName || 'Tu nombre';
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
+      {/* Encabezado sticky: el estado de guardado siempre visible mientras editas. */}
+      <div className="sticky top-0 z-20 -mx-4 mb-5 flex items-center justify-between gap-3 border-b bg-background/95 px-4 py-2.5 backdrop-blur sm:-mx-5 sm:px-5">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Apariencia</h1>
-          <p className="text-sm text-muted-foreground">Se guarda solo mientras editas.</p>
+          <h1 className="text-xl font-extrabold tracking-tight">Apariencia</h1>
+          <p className="text-xs text-muted-foreground">Se guarda solo mientras editas.</p>
         </div>
-        <SaveIndicator status={status} />
+        <SaveIndicator status={status} onRetry={retry} />
       </div>
 
       {/* Vista previa */}
@@ -346,18 +393,28 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
+function SaveIndicator({ status, onRetry }: { status: SaveStatus; onRetry: () => void }) {
   if (status === 'saving')
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Guardando…
       </span>
     );
   if (status === 'saved')
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600">
         <Check className="h-3.5 w-3.5" /> Guardado
       </span>
     );
-  return <span className="text-xs text-muted-foreground">Auto-guardado activo</span>;
+  if (status === 'error')
+    return (
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-destructive/10 px-3 text-xs font-bold text-destructive transition-colors hover:bg-destructive/20"
+      >
+        No se guardó · Reintentar
+      </button>
+    );
+  return <span className="shrink-0 text-xs text-muted-foreground">Auto-guardado activo</span>;
 }

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Receipt, ScanLine } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { Receipt, ScanLine, Search, X } from 'lucide-react';
 import {
   formatMXN,
   formatDateTimeMX,
@@ -12,6 +12,7 @@ import {
 import { orderService, type OrderFilter } from '@/services/orders';
 import { ApiError, apiAssetUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader, EmptyState } from '@/components/ui/misc';
 import {
@@ -21,6 +22,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { OrderStatusBadge } from '@/lib/statusBadges';
 import { WhatsAppButton } from '@/components/brand/WhatsAppButton';
 import { QrScanner } from '@/components/owner/QrScanner';
@@ -42,7 +44,10 @@ const TABS: { value: UrlFilter; label: string }[] = [
   { value: 'todas', label: 'Todas' },
 ];
 
-function ProofDialog({ orderId }: { orderId: string }) {
+const PAGE_SIZE = 15;
+const MAX_CHIPS = 10;
+
+function ProofDialog({ orderId, className }: { orderId: string; className?: string }) {
   const [open, setOpen] = useState(false);
   const proofsQuery = useQuery({
     queryKey: ['order-proofs', orderId],
@@ -53,8 +58,8 @@ function ProofDialog({ orderId }: { orderId: string }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        Ver comprobante
+      <Button variant="outline" size="sm" className={className} onClick={() => setOpen(true)}>
+        Comprobante
       </Button>
       <DialogContent>
         <DialogHeader>
@@ -75,7 +80,13 @@ function ProofDialog({ orderId }: { orderId: string }) {
                 rel="noopener noreferrer"
                 className="block overflow-hidden rounded-xl border"
               >
-                <img src={apiAssetUrl(proof.fileUrl)} alt="Comprobante de pago" className="w-full object-contain" />
+                <img
+                  src={apiAssetUrl(proof.fileUrl)}
+                  alt="Comprobante de pago"
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full object-contain"
+                />
                 {proof.note && <p className="p-3 text-sm text-muted-foreground">{proof.note}</p>}
               </a>
             ))}
@@ -86,8 +97,36 @@ function ProofDialog({ orderId }: { orderId: string }) {
   );
 }
 
+// Números de boleto con límite: una orden de 200 boletos no debe hacer la
+// tarjeta interminable. Se muestran los primeros y un "+N más" expandible.
+function TicketChips({ numbers }: { numbers: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (numbers.length === 0) return null;
+  const visible = expanded ? numbers : numbers.slice(0, MAX_CHIPS);
+  const hidden = numbers.length - visible.length;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {visible.map((n) => (
+        <span key={n} className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
+          {n}
+        </span>
+      ))}
+      {(hidden > 0 || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          className="rounded-md bg-brand/10 px-2 py-0.5 font-mono text-xs font-bold text-brand transition-colors hover:bg-brand/20"
+        >
+          {expanded ? 'ver menos' : `+${hidden} más`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function OrderCard({ order }: { order: OrderDTO }) {
   const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState<'reject' | 'cancel' | null>(null);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -96,31 +135,48 @@ function OrderCard({ order }: { order: OrderDTO }) {
 
   const onError = (e: unknown) => toast.error(e instanceof ApiError ? e.message : 'Algo salió mal');
 
+  // Cambia el estado de la orden en caché al instante (optimista) y revierte
+  // si el servidor falla: en redes lentas el panel se siente inmediato.
+  const optimisticStatus = (status: OrderDTO['status']) => ({
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['orders'] });
+      const previous = queryClient.getQueriesData<{ items: OrderDTO[] }>({ queryKey: ['orders'] });
+      queryClient.setQueriesData<{ items: OrderDTO[] } | undefined>({ queryKey: ['orders'] }, (data) =>
+        data
+          ? { items: data.items.map((o) => (o.id === order.id ? { ...o, status } : o)) }
+          : data,
+      );
+      return { previous };
+    },
+    onError: (e: unknown, _vars: void, ctx?: { previous: [QueryKey, { items: OrderDTO[] } | undefined][] }) => {
+      ctx?.previous.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      onError(e);
+    },
+    onSettled: invalidate,
+  });
+
   const markPaid = useMutation({
     mutationFn: () => orderService.markPaid(order.id),
-    onSuccess: () => {
-      toast.success('Orden marcada como pagada');
-      invalidate();
-    },
-    onError,
+    ...optimisticStatus('PAID'),
+    onSuccess: () => toast.success('Orden marcada como pagada'),
   });
 
   const reject = useMutation({
     mutationFn: () => orderService.reject(order.id),
+    ...optimisticStatus('REJECTED'),
     onSuccess: () => {
+      setConfirming(null);
       toast.success('Orden rechazada');
-      invalidate();
     },
-    onError,
   });
 
   const cancel = useMutation({
     mutationFn: () => orderService.cancel(order.id),
+    ...optimisticStatus('CANCELLED'),
     onSuccess: () => {
+      setConfirming(null);
       toast.success('Orden cancelada');
-      invalidate();
     },
-    onError,
   });
 
   // Acciones de cobro: aplican a apartadas (RESERVED) y a las que ya subieron
@@ -151,15 +207,7 @@ function OrderCard({ order }: { order: OrderDTO }) {
         <span className="text-muted-foreground">· {order.eventLabel}</span>
       </div>
 
-      {order.ticketNumbers.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {order.ticketNumbers.map((n) => (
-            <span key={n} className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-semibold">
-              {n}
-            </span>
-          ))}
-        </div>
-      )}
+      <TicketChips numbers={order.ticketNumbers} />
 
       <div className="flex items-center justify-between gap-2 border-t pt-3">
         <p className="text-xl font-extrabold tracking-tight">{formatMXN(order.totalAmount)}</p>
@@ -170,22 +218,22 @@ function OrderCard({ order }: { order: OrderDTO }) {
         <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">Vence en {remaining}</p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {isPending && (
-          <Button variant="success" size="sm" loading={markPaid.isPending} onClick={() => markPaid.mutate()}>
+      {/* Acción principal a la vista; lo demás en fila secundaria. */}
+      {isPending && (
+        <div className="flex gap-2">
+          {order.hasProof && <ProofDialog orderId={order.id} className="h-11 flex-1" />}
+          <Button
+            variant="success"
+            className="h-11 flex-[1.4]"
+            loading={markPaid.isPending}
+            onClick={() => markPaid.mutate()}
+          >
             Marcar pagado
           </Button>
-        )}
-        {isPending && (
-          <Button variant="destructive" size="sm" loading={reject.isPending} onClick={() => reject.mutate()}>
-            Rechazar
-          </Button>
-        )}
-        {isPending && (
-          <Button variant="outline" size="sm" loading={cancel.isPending} onClick={() => cancel.mutate()}>
-            Cancelar
-          </Button>
-        )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
         <WhatsAppButton phone={waPhone} message={waMessage} size="sm" />
         {order.digitalTicketCode && (
           <Button asChild variant="outline" size="sm">
@@ -194,12 +242,65 @@ function OrderCard({ order }: { order: OrderDTO }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Descargar boleto
+              Boleto digital
             </a>
           </Button>
         )}
-        {order.hasProof && <ProofDialog orderId={order.id} />}
+        {!isPending && order.hasProof && <ProofDialog orderId={order.id} />}
+        {isPending && (
+          <div className="ml-auto flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={() => setConfirming('reject')}
+            >
+              Rechazar
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setConfirming('cancel')}
+            >
+              Cancelar
+            </Button>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={confirming === 'reject'}
+        onOpenChange={(o) => !o && setConfirming(null)}
+        title="¿Rechazar este pago?"
+        description={
+          <>
+            La orden <span className="font-mono font-semibold">{order.code}</span> de{' '}
+            <span className="font-semibold">{order.buyer.fullName}</span> se marcará como rechazada y
+            sus boletos volverán a estar disponibles. Esta acción no se puede deshacer.
+          </>
+        }
+        confirmLabel="Sí, rechazar"
+        destructive
+        loading={reject.isPending}
+        onConfirm={() => reject.mutate()}
+      />
+      <ConfirmDialog
+        open={confirming === 'cancel'}
+        onOpenChange={(o) => !o && setConfirming(null)}
+        title="¿Cancelar este apartado?"
+        description={
+          <>
+            La orden <span className="font-mono font-semibold">{order.code}</span> de{' '}
+            <span className="font-semibold">{order.buyer.fullName}</span> se cancelará y sus boletos
+            volverán a estar disponibles. Esta acción no se puede deshacer.
+          </>
+        }
+        confirmLabel="Sí, cancelar apartado"
+        destructive
+        loading={cancel.isPending}
+        onConfirm={() => cancel.mutate()}
+      />
     </div>
   );
 }
@@ -208,6 +309,8 @@ export default function Orders() {
   const params = useParams<{ filter?: string }>();
   const navigate = useNavigate();
   const [scanOpen, setScanOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const urlFilter: UrlFilter =
     params.filter && params.filter in URL_TO_API ? (params.filter as UrlFilter) : 'pendientes';
@@ -219,6 +322,25 @@ export default function Orders() {
   });
 
   const orders = ordersQuery.data?.items ?? [];
+
+  // Búsqueda local: código de orden, nombre, teléfono o rifa.
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(
+      (o) =>
+        o.code.toLowerCase().includes(q) ||
+        o.buyer.fullName.toLowerCase().includes(q) ||
+        o.buyer.phone.toLowerCase().includes(q) ||
+        o.raffleTitle.toLowerCase().includes(q),
+    );
+  }, [orders, search]);
+
+  // Render incremental: con cientos de órdenes el DOM no se desploma.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [urlFilter, search]);
+  const visible = filtered.slice(0, visibleCount);
 
   return (
     <div>
@@ -244,20 +366,61 @@ export default function Orders() {
         </TabsList>
       </Tabs>
 
+      {/* Búsqueda */}
+      <div className="relative mt-3">
+        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, teléfono, código o rifa"
+          className="pl-10 pr-10"
+          autoComplete="off"
+        />
+        {search && (
+          <button
+            type="button"
+            aria-label="Limpiar búsqueda"
+            onClick={() => setSearch('')}
+            className="absolute right-1 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       <div className="mt-4">
         {ordersQuery.isLoading ? (
           <PageLoader />
-        ) : orders.length === 0 ? (
-          <EmptyState
-            title="Sin órdenes por aquí"
-            description="Cuando alguien aparte boletos, sus órdenes aparecerán en esta lista."
-          />
+        ) : filtered.length === 0 ? (
+          search ? (
+            <EmptyState
+              title="Sin resultados"
+              description={`Ninguna orden coincide con "${search}". Prueba con el código, nombre o teléfono.`}
+            />
+          ) : (
+            <EmptyState
+              title="Sin órdenes por aquí"
+              description="Cuando alguien aparte boletos, sus órdenes aparecerán en esta lista."
+            />
+          )
         ) : (
-          <div className="flex flex-col gap-3">
-            {orders.map((order) => (
-              <OrderCard key={order.id} order={order} />
-            ))}
-          </div>
+          <>
+            <div className="flex flex-col gap-3">
+              {visible.map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+            </div>
+            {filtered.length > visibleCount && (
+              <Button
+                variant="outline"
+                size="lg"
+                className="mt-4 w-full"
+                onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              >
+                Cargar más ({filtered.length - visibleCount} restantes)
+              </Button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -40,6 +40,7 @@ const DashPayments = lazy(() => import('@/pages/dashboard/Payments'));
 const DashReports = lazy(() => import('@/pages/dashboard/Reports'));
 const DashPlan = lazy(() => import('@/pages/dashboard/Plan'));
 const DashSettings = lazy(() => import('@/pages/dashboard/Settings'));
+const DashMore = lazy(() => import('@/pages/dashboard/PanelMore'));
 
 const AdminHome = lazy(() => import('@/pages/admin/AdminHome'));
 const AdminRiferos = lazy(() => import('@/pages/admin/AdminRiferos'));
@@ -121,6 +122,7 @@ function MainApp() {
             <Route path="reportes" element={<DashReports />} />
             <Route path="plan" element={<DashPlan />} />
             <Route path="configuracion" element={<DashSettings />} />
+            <Route path="mas" element={<DashMore />} />
           </Route>
         </Route>
 

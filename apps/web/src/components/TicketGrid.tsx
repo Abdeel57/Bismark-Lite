@@ -324,7 +324,7 @@ export function TicketGrid({
                 <button
                   type="button"
                   onClick={() => setLuckyQty((q) => Math.max(1, q - 1))}
-                  className="grid h-9 w-9 place-items-center rounded-lg border-2 text-xl font-bold leading-none"
+                  className="grid h-11 w-11 place-items-center rounded-lg border-2 text-xl font-bold leading-none active:scale-95"
                   style={{ borderColor: brand, color: brand }}
                   aria-label="Menos"
                 >
@@ -332,16 +332,17 @@ export function TicketGrid({
                 </button>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min={1}
                   value={luckyQty}
                   onChange={(e) => setLuckyQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
-                  className="h-9 w-16 rounded-lg border-2 text-center font-ticket text-base font-bold outline-none"
+                  className="h-11 w-16 rounded-lg border-2 text-center font-ticket text-base font-bold outline-none"
                   style={{ borderColor: brand }}
                 />
                 <button
                   type="button"
                   onClick={() => setLuckyQty((q) => Math.min(999, q + 1))}
-                  className="grid h-9 w-9 place-items-center rounded-lg border-2 text-xl font-bold leading-none"
+                  className="grid h-11 w-11 place-items-center rounded-lg border-2 text-xl font-bold leading-none active:scale-95"
                   style={{ borderColor: brand, color: brand }}
                   aria-label="Más"
                 >
@@ -393,7 +394,7 @@ export function TicketGrid({
       {/* Cuadrícula virtualizada */}
       <div
         ref={parentRef}
-        className="relative h-[min(64vh,540px)] overflow-y-auto overscroll-contain rounded-xl border bg-background p-1.5"
+        className="relative h-[min(60dvh,540px)] overflow-y-auto overscroll-contain rounded-xl border bg-background p-1.5"
       >
         {filtered.length === 0 ? (
           <div className="grid h-full place-items-center text-sm text-muted-foreground">Sin boletos para mostrar</div>

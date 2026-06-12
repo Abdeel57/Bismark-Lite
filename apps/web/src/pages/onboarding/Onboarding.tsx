@@ -95,7 +95,7 @@ export default function Onboarding() {
     onSuccess: async () => {
       await fetchMe();
       toast.success('¡Tu página de rifas está lista!');
-      navigate('/panel', { replace: true });
+      navigate('/panel', { replace: true }); // muestra la página recién creada (con intro del panel)
     },
     onError: (err) => {
       toast.error(err instanceof ApiError ? err.message : 'No pudimos guardar tu información. Inténtalo de nuevo.');

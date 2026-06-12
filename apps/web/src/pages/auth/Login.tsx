@@ -19,7 +19,9 @@ import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 function destinationFor(user: AuthUserDTO): string {
   if (user.role === 'SUPER_ADMIN') return '/admin';
   if (!user.hasProfile) return '/onboarding';
-  return '/panel';
+  // Directo al administrador: en móvil es la pantalla de trabajo; la vista
+  // previa de la página queda a un toque ("Mi página").
+  return '/panel/admin/inicio';
 }
 
 export default function Login() {

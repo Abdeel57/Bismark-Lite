@@ -61,7 +61,9 @@ export default function RaffleForm() {
   const [step, setStep] = useState(0);
   const topRef = useRef<HTMLDivElement>(null);
   const [images, setImages] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  // Progreso de subida visible: "Subiendo 2 de 3…" en vez de un spinner mudo.
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  const uploading = uploadProgress !== null;
   const [drawLocal, setDrawLocal] = useState('');
   const [drawError, setDrawError] = useState<string | undefined>(undefined);
   // Rifa recién creada → pantalla de éxito (publicar / ver / compartir).
@@ -192,7 +194,11 @@ export default function RaffleForm() {
 
   const next = async () => {
     const ok = await trigger(STEP_FIELDS[step]);
-    if (ok) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (ok) {
+      setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    } else {
+      toast.error('Revisa los campos marcados en rojo para continuar.');
+    }
   };
   const back = () => {
     if (step === 0) navigate('/panel/admin/rifas');
@@ -206,20 +212,22 @@ export default function RaffleForm() {
       toast.error(`Máximo ${MAX_IMAGES} imágenes.`);
       return;
     }
-    setUploading(true);
+    const queue = Array.from(files).slice(0, remaining);
+    setUploadProgress({ done: 0, total: queue.length });
     try {
       const urls: string[] = [];
-      for (const file of Array.from(files).slice(0, remaining)) {
+      for (const [i, file] of queue.entries()) {
         const res = await uploadService.image(file, 'prizes');
         urls.push(res.url);
+        setUploadProgress({ done: i + 1, total: queue.length });
       }
       const nextImgs = [...images, ...urls];
       setImages(nextImgs);
       setValue('images', nextImgs, { shouldValidate: true });
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'No se pudieron subir las imágenes');
+      toast.error(e instanceof ApiError ? e.message : 'No se pudieron subir las imágenes. Revisa tu conexión e inténtalo de nuevo.');
     } finally {
-      setUploading(false);
+      setUploadProgress(null);
     }
   }
   function removeImage(url: string) {
@@ -386,12 +394,12 @@ export default function RaffleForm() {
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                 {images.map((url) => (
                   <div key={url} className="relative aspect-square overflow-hidden rounded-xl border bg-muted">
-                    <img src={apiAssetUrl(url)} alt="Premio" className="h-full w-full object-cover" />
+                    <img src={apiAssetUrl(url)} alt="Premio" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeImage(url)}
                       aria-label="Quitar imagen"
-                      className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-black/60 text-base leading-none text-white"
+                      className="absolute right-1 top-1 grid h-8 w-8 place-items-center rounded-full bg-black/60 text-lg leading-none text-white transition-colors active:bg-black/80"
                     >
                       ×
                     </button>
@@ -400,11 +408,11 @@ export default function RaffleForm() {
                 {images.length < MAX_IMAGES && (
                   <label
                     className={cn(
-                      'grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed px-1 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-accent',
+                      'grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed px-1 text-center text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent active:bg-accent',
                       uploading && 'pointer-events-none opacity-60',
                     )}
                   >
-                    {uploading ? 'Subiendo…' : 'Agregar foto'}
+                    {uploadProgress ? `Subiendo ${Math.min(uploadProgress.done + 1, uploadProgress.total)} de ${uploadProgress.total}…` : 'Agregar foto'}
                     <input
                       type="file"
                       accept="image/*"
@@ -462,18 +470,19 @@ export default function RaffleForm() {
           )}
         </FormSection>
 
-        {/* Navegación del asistente */}
-        <div className="mt-4 flex items-center gap-3">
-          <Button type="button" variant="ghost" onClick={back}>
+        {/* Navegación del asistente: sticky para que Siguiente/Guardar siempre
+            estén a la mano (en móvil, sin perseguirlos con el scroll). */}
+        <div className="sticky bottom-0 z-10 -mx-4 mt-4 flex items-center gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+          <Button type="button" variant="ghost" size="lg" onClick={back}>
             {step === 0 ? 'Cancelar' : 'Atrás'}
           </Button>
           <div className="flex-1" />
           {step < STEPS.length - 1 ? (
-            <Button type="button" variant="brand" size="lg" onClick={() => void next()}>
+            <Button type="button" variant="brand" size="lg" className="min-w-[40%]" onClick={() => void next()}>
               Siguiente
             </Button>
           ) : (
-            <Button type="submit" variant="brand" size="lg" loading={save.isPending}>
+            <Button type="submit" variant="brand" size="lg" className="min-w-[40%]" loading={save.isPending} disabled={uploading}>
               {isEdit ? 'Guardar cambios' : 'Crear rifa'}
             </Button>
           )}

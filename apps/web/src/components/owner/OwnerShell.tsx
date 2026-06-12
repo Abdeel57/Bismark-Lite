@@ -54,7 +54,7 @@ function FirstTimeIntro({ onDone }: { onDone: () => void }) {
     onDone();
   };
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-4 backdrop-blur-[2px] sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-[2px] sm:items-center">
       <div className="w-full max-w-sm animate-slide-up rounded-3xl border bg-card p-6 shadow-2xl">
         <p className="text-3xl">👋</p>
         <h2 className="mt-2 font-display text-xl font-extrabold tracking-tight">¡Esta es tu página!</h2>
@@ -161,7 +161,7 @@ export function OwnerShell() {
 
   if (profileQ.isLoading) {
     return (
-      <div className="grid min-h-screen place-items-center">
+      <div className="grid min-h-[100dvh] place-items-center">
         <PageLoader label="Cargando tu página..." />
       </div>
     );
@@ -171,15 +171,35 @@ export function OwnerShell() {
   if (profileQ.isError || !profile || !previewData) {
     const isForbidden = profileQ.error instanceof ApiError && profileQ.error.status === 403;
     return (
-      <div className="grid min-h-screen place-items-center px-6 text-center">
-        <div>
-          <h1 className="text-xl font-bold">Esta sección es para riferos</h1>
-          <p className="mt-2 text-muted-foreground">
-            {isForbidden ? 'Tu cuenta no tiene una página de rifas.' : 'No pudimos cargar tu página.'}
-          </p>
-          <Button asChild className="mt-6">
-            <Link to="/admin">Ir al panel de administración</Link>
-          </Button>
+      <div className="grid min-h-[100dvh] place-items-center px-6 text-center">
+        <div className="w-full max-w-sm">
+          {isForbidden ? (
+            <>
+              <h1 className="text-xl font-bold">Esta sección es para riferos</h1>
+              <p className="mt-2 text-muted-foreground">Tu cuenta no tiene una página de rifas.</p>
+              <Button asChild className="mt-6 w-full" size="lg">
+                <Link to="/admin">Ir al panel de administración</Link>
+              </Button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-bold">No pudimos cargar tu página</h1>
+              <p className="mt-2 text-muted-foreground">
+                Revisa tu conexión a internet e inténtalo de nuevo.
+              </p>
+              <Button
+                className="mt-6 w-full"
+                size="lg"
+                loading={profileQ.isFetching}
+                onClick={() => void profileQ.refetch()}
+              >
+                Reintentar
+              </Button>
+              <Button asChild variant="ghost" className="mt-2 w-full" size="lg">
+                <Link to="/login">Volver a iniciar sesión</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );

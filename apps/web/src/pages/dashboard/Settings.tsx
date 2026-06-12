@@ -25,6 +25,26 @@ const settingsSchema = updateRiferoSchema.pick({
 });
 type SettingsForm = z.infer<typeof settingsSchema>;
 
+// Atajos de tiempo de apartado: escribir "1440" en un teléfono es tedioso.
+const RESERVE_PRESETS = [
+  { label: '1 hora', minutes: 60 },
+  { label: '2 horas', minutes: 120 },
+  { label: '6 horas', minutes: 360 },
+  { label: '24 horas', minutes: 1440 },
+  { label: '3 días', minutes: 4320 },
+];
+
+function humanMinutes(min: number): string {
+  if (!min || Number.isNaN(min)) return '';
+  if (min < 60) return `${min} minuto${min === 1 ? '' : 's'}`;
+  if (min < 1440) {
+    const h = Math.round((min / 60) * 10) / 10;
+    return `${h} hora${h === 1 ? '' : 's'}`;
+  }
+  const d = Math.round((min / 1440) * 10) / 10;
+  return `${d} día${d === 1 ? '' : 's'}`;
+}
+
 interface ToggleRowProps {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
@@ -71,6 +91,8 @@ export default function Settings() {
     handleSubmit,
     control,
     reset,
+    setValue,
+    watch,
     formState: { errors, isDirty },
   } = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema),
@@ -143,6 +165,25 @@ export default function Settings() {
               <Clock className="h-4 w-4" />
               Minutos para apartar un boleto
             </Label>
+            <div className="flex flex-wrap gap-2">
+              {RESERVE_PRESETS.map((p) => {
+                const active = watch('defaultReserveMinutes') === p.minutes;
+                return (
+                  <button
+                    key={p.minutes}
+                    type="button"
+                    onClick={() => setValue('defaultReserveMinutes', p.minutes, { shouldDirty: true })}
+                    className={
+                      active
+                        ? 'rounded-full bg-brand px-3.5 py-2 text-sm font-bold text-white'
+                        : 'rounded-full border px-3.5 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-accent'
+                    }
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
             <Input
               id="defaultReserveMinutes"
               type="number"
@@ -153,6 +194,15 @@ export default function Settings() {
             />
             <p className="text-xs text-muted-foreground">
               Tiempo que un comprador tiene para pagar antes de que su apartado expire.
+              {(() => {
+                const eq = humanMinutes(Number(watch('defaultReserveMinutes')));
+                return eq ? (
+                  <>
+                    {' '}
+                    Ahora: <span className="font-semibold text-foreground">{eq}</span>.
+                  </>
+                ) : null;
+              })()}
             </p>
             {errors.defaultReserveMinutes && (
               <p className="mt-1 text-sm text-destructive">{errors.defaultReserveMinutes.message}</p>
@@ -208,16 +258,24 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <Button
-          type="submit"
-          size="lg"
-          className="w-full"
-          loading={updateMutation.isPending}
-          disabled={!isDirty}
-        >
-          <Save className="h-5 w-5" />
-          Guardar cambios
-        </Button>
+        {/* Barra de guardar sticky: visible apenas hay cambios, sin perseguirla. */}
+        <div className="sticky bottom-0 z-10 -mx-4 border-t bg-background/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+          {isDirty && (
+            <p className="mb-2 text-center text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Tienes cambios sin guardar
+            </p>
+          )}
+          <Button
+            type="submit"
+            size="lg"
+            className="w-full"
+            loading={updateMutation.isPending}
+            disabled={!isDirty}
+          >
+            <Save className="h-5 w-5" />
+            Guardar cambios
+          </Button>
+        </div>
       </form>
     </div>
   );

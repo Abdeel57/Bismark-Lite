@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Trophy, Plus, X, Play, Award, CheckCircle2, Info, Video, Upload, Trash2 } from 'lucide-react';
+import { Trophy, Plus, X, Play, Award, CheckCircle2, Info, Video, Upload, Trash2 } from 'lucide-react';
 import {
   formatTicketNumber,
   type WinnerDTO,
@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { PageLoader, EmptyState, Separator } from '@/components/ui/misc';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 
 interface PrizeRow {
@@ -147,11 +148,11 @@ function DrawEvidence({ raffleId, currentUrl }: { raffleId: string; currentUrl: 
 export default function RaffleDraw() {
   const { id } = useParams<{ id: string }>();
   const raffleId = id as string;
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const [prizes, setPrizes] = useState<PrizeRow[]>([{ position: 1, prizeDescription: '' }]);
   const [allowRepeatWinner, setAllowRepeatWinner] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Tómbola
   const [spinning, setSpinning] = useState(false);
@@ -218,10 +219,14 @@ export default function RaffleDraw() {
   const draw = useMutation({
     mutationFn: (input: DrawInput) => winnerService.draw(raffleId, input),
     onSuccess: (res) => {
+      setConfirmOpen(false);
       toast.success('¡Sorteo realizado!');
       startTombola(res.winners);
     },
-    onError: (e) => toast.error(e instanceof ApiError ? e.message : 'No se pudo realizar el sorteo'),
+    onError: (e) => {
+      setConfirmOpen(false);
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo realizar el sorteo');
+    },
   });
 
   function handleDraw() {
@@ -247,19 +252,8 @@ export default function RaffleDraw() {
 
   return (
     <div>
-      <PageHeader
-        title="Sorteo"
-        description={`${raffle.eventLabel} · ${raffle.title}`}
-        back={
-          <button
-            type="button"
-            onClick={() => navigate('/panel/admin/rifas')}
-            className="mb-1 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver
-          </button>
-        }
-      />
+      {/* El regreso vive en el header del panel (flecha "atrás"). */}
+      <PageHeader title="Sorteo" description={`${raffle.eventLabel} · ${raffle.title}`} />
 
       {/* Aviso: solo boletos pagados */}
       <Card className="mb-4 border-blue-200 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/30">
@@ -278,10 +272,10 @@ export default function RaffleDraw() {
       {/* Animación tómbola */}
       {spinning && (
         <Card className="mb-4 border-amber-300 bg-gradient-to-b from-amber-50 to-background dark:border-amber-900 dark:from-amber-950/40">
-          <CardContent className="grid place-items-center gap-2 py-8">
+          <CardContent className="grid place-items-center gap-2 py-6 sm:py-8">
             <Trophy className="h-8 w-8 animate-bounce text-amber-500" />
             <p className="text-sm font-semibold text-muted-foreground">Sorteando...</p>
-            <p className="font-mono text-5xl font-extrabold tabular-nums text-amber-600 dark:text-amber-400">
+            <p className="font-mono text-4xl font-extrabold tabular-nums text-amber-600 dark:text-amber-400 sm:text-5xl">
               {spinValue || '---'}
             </p>
             {pendingWinners && pendingWinners.length > 1 && (
@@ -368,7 +362,7 @@ export default function RaffleDraw() {
               className="w-full"
               loading={draw.isPending || spinning}
               disabled={raffle.soldCount === 0}
-              onClick={handleDraw}
+              onClick={() => setConfirmOpen(true)}
             >
               <Play className="h-5 w-5" />
               Iniciar sorteo
@@ -381,6 +375,29 @@ export default function RaffleDraw() {
           </CardContent>
         </Card>
       )}
+
+      {/* El sorteo es definitivo: confirmar antes de tirar la tómbola. */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="¿Iniciar el sorteo?"
+        description={
+          <>
+            Se elegirá{prizes.length > 1 ? 'n' : ''}{' '}
+            <span className="font-semibold text-foreground">
+              {prizes.length} ganador{prizes.length > 1 ? 'es' : ''}
+            </span>{' '}
+            al azar entre los{' '}
+            <span className="font-semibold text-foreground">
+              {raffle.soldCount.toLocaleString('es-MX')} boletos pagados
+            </span>
+            . El resultado es definitivo: no se puede repetir el sorteo.
+          </>
+        }
+        confirmLabel="Sí, sortear ahora"
+        loading={draw.isPending}
+        onConfirm={handleDraw}
+      />
     </div>
   );
 }

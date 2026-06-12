@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
@@ -12,8 +12,6 @@ import {
   MessageCircle,
   Image as ImageIcon,
   Loader2,
-  Check,
-  X,
   Upload,
   ArrowRight,
   ArrowLeft,
@@ -22,7 +20,6 @@ import {
 import {
   onboardingSchema,
   type OnboardingInput,
-  isValidSlug,
   slugify,
   BRAND,
 } from '@bismark/shared';
@@ -39,13 +36,6 @@ import { Logo } from '@/components/brand/Logo';
 import { ThemeToggle } from '@/components/brand/ThemeToggle';
 import { cn } from '@/lib/cn';
 
-type SlugState =
-  | { status: 'idle' }
-  | { status: 'invalid'; reason: string }
-  | { status: 'checking' }
-  | { status: 'available' }
-  | { status: 'taken'; reason: string };
-
 type Step = 1 | 2;
 
 const STEP1_FIELDS = ['fullName', 'email', 'phone'] as const;
@@ -56,10 +46,8 @@ export default function Onboarding() {
   const fetchMe = useAuthStore((s) => s.fetchMe);
 
   const [step, setStep] = useState<Step>(1);
-  const [slugState, setSlugState] = useState<SlugState>({ status: 'idle' });
   const [logoUploading, setLogoUploading] = useState(false);
   const [coverUploading, setCoverUploading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     register,
@@ -75,7 +63,6 @@ export default function Onboarding() {
       email: user?.email ?? '',
       phone: user?.phone ?? '',
       publicName: '',
-      slug: '',
       whatsapp: user?.phone ?? '',
       description: '',
       logoUrl: '',
@@ -97,49 +84,11 @@ export default function Onboarding() {
     setValue('whatsapp', user.phone ?? '');
   }, [user, setValue]);
 
-  const slug = watch('slug');
   const logoUrl = watch('logoUrl');
   const coverUrl = watch('coverUrl');
   const publicName = watch('publicName');
   const primaryColor = watch('primaryColor');
   const secondaryColor = watch('secondaryColor');
-
-  // Verificación de disponibilidad del slug en vivo (con debounce).
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    const value = (slug ?? '').trim();
-
-    if (!value) {
-      setSlugState({ status: 'idle' });
-      return;
-    }
-    if (!isValidSlug(value)) {
-      setSlugState({
-        status: 'invalid',
-        reason: 'Usa de 3 a 32 letras minúsculas, números o guiones (sin acentos ni espacios).',
-      });
-      return;
-    }
-
-    setSlugState({ status: 'checking' });
-    debounceRef.current = setTimeout(() => {
-      void riferoService
-        .checkSlug(value)
-        .then((res) => {
-          if ((watch('slug') ?? '').trim() !== value) return; // ignorar resultados obsoletos
-          if (res.available) setSlugState({ status: 'available' });
-          else setSlugState({ status: 'taken', reason: res.reason ?? 'Ese nombre ya está ocupado, elige otro.' });
-        })
-        .catch(() => {
-          setSlugState({ status: 'taken', reason: 'No pudimos verificar la disponibilidad, intenta de nuevo.' });
-        });
-    }, 500);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
 
   const onboardingMutation = useMutation({
     mutationFn: (input: OnboardingInput) => riferoService.onboarding(input),
@@ -156,10 +105,6 @@ export default function Onboarding() {
   async function handleContinue() {
     const ok = await trigger([...STEP1_FIELDS]);
     if (ok) setStep(2);
-  }
-
-  function handleSlugChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setValue('slug', slugify(e.target.value), { shouldValidate: false });
   }
 
   async function handleImage(
@@ -182,15 +127,13 @@ export default function Onboarding() {
   }
 
   function onSubmit(data: OnboardingInput) {
-    if (slugState.status !== 'available') {
-      toast.error('Elige un nombre de página disponible antes de continuar.');
-      setStep(2);
-      return;
-    }
+    // El subdominio lo genera el backend a partir del nombre público; no se envía.
     onboardingMutation.mutate(data);
   }
 
-  const previewUrl = `${(slug ?? '').trim() || 'tu-rifa'}.${BRAND.rootDomain}`;
+  // Vista previa de la dirección, derivada en vivo del nombre público.
+  const previewSlug = slugify(publicName ?? '');
+  const previewUrl = `${previewSlug || 'tu-rifa'}.${BRAND.rootDomain}`;
 
   return (
     <div className="min-h-screen bg-background px-4 py-6">
@@ -295,11 +238,7 @@ export default function Onboarding() {
                       id="publicName"
                       className="pl-10"
                       placeholder="Ej. Rifas Don Juan"
-                      {...register('publicName', {
-                        onChange: (e) => {
-                          if (!(slug ?? '').trim()) setValue('slug', slugify(e.target.value));
-                        },
-                      })}
+                      {...register('publicName')}
                     />
                   </div>
                   {errors.publicName && (
@@ -307,53 +246,21 @@ export default function Onboarding() {
                   )}
                 </div>
 
-                {/* Slug / subdominio con verificación en vivo */}
+                {/* Dirección de la página: se genera sola desde el nombre público (no editable) */}
                 <div>
-                  <Label htmlFor="slug">Dirección de tu página (subdominio)</Label>
+                  <Label>Dirección de tu página</Label>
                   <div className="relative">
                     <Globe className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="slug"
-                      className={cn(
-                        'pl-10 pr-10 lowercase',
-                        slugState.status === 'available' && 'border-emerald-500 focus-visible:ring-emerald-500',
-                        (slugState.status === 'taken' || slugState.status === 'invalid') &&
-                          'border-destructive focus-visible:ring-destructive',
-                      )}
-                      placeholder="tu-rifa"
-                      autoCapitalize="none"
-                      autoComplete="off"
-                      spellCheck={false}
-                      value={slug}
-                      onChange={handleSlugChange}
-                    />
-                    <div className="absolute right-3.5 top-1/2 -translate-y-1/2">
-                      {slugState.status === 'checking' && (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      )}
-                      {slugState.status === 'available' && <Check className="h-4 w-4 text-emerald-600" />}
-                      {(slugState.status === 'taken' || slugState.status === 'invalid') && (
-                        <X className="h-4 w-4 text-destructive" />
-                      )}
+                    <div
+                      aria-readonly
+                      className="flex h-11 w-full items-center rounded-xl border border-input bg-muted/50 pl-10 pr-3 text-sm font-semibold text-foreground"
+                    >
+                      <span className="truncate">{previewUrl}</span>
                     </div>
                   </div>
-                  <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-                    Tu página:&nbsp;<span className="font-semibold text-foreground">{previewUrl}</span>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Se crea automáticamente con tu nombre público. Podrás solicitar un cambio con soporte más adelante.
                   </p>
-                  {slugState.status === 'available' && (
-                    <p className="mt-1 flex items-center gap-1 text-sm text-emerald-600">
-                      <Check className="h-3.5 w-3.5" /> Disponible
-                    </p>
-                  )}
-                  {slugState.status === 'taken' && (
-                    <p className="text-destructive text-sm mt-1">{slugState.reason}</p>
-                  )}
-                  {slugState.status === 'invalid' && (
-                    <p className="text-destructive text-sm mt-1">{slugState.reason}</p>
-                  )}
-                  {errors.slug && slugState.status === 'idle' && (
-                    <p className="text-destructive text-sm mt-1">{errors.slug.message}</p>
-                  )}
                 </div>
 
                 <div>
@@ -520,16 +427,10 @@ export default function Onboarding() {
                     size="lg"
                     className="flex-1"
                     loading={onboardingMutation.isPending || logoUploading || coverUploading}
-                    disabled={slugState.status !== 'available'}
                   >
                     {publicName ? `Crear "${publicName}"` : 'Crear mi página'}
                   </Button>
                 </div>
-                {slugState.status !== 'available' && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    Elige un subdominio disponible para terminar.
-                  </p>
-                )}
               </CardContent>
             </Card>
           )}

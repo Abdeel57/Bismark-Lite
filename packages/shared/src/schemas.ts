@@ -68,7 +68,9 @@ export const onboardingSchema = z.object({
   phone: z.string().min(10).max(20),
   // Sección 2: página de rifas
   publicName: z.string().min(2, 'Nombre público requerido').max(80),
-  slug: slugSchema,
+  // El subdominio NO lo configura el cliente: se deriva automáticamente de
+  // publicName en el backend (slugify + sufijo único). Opcional para compat.
+  slug: slugSchema.optional(),
   whatsapp: z.string().min(10).max(20),
   description: z.string().max(600).optional().or(z.literal('')),
   logoUrl: imageUrl.optional().or(z.literal('')),

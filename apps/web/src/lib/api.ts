@@ -13,6 +13,31 @@ export class ApiError extends Error {
   }
 }
 
+// ── Token Bearer (fallback de sesión) ────────────────────────
+// La sesión principal es la cookie httpOnly, pero Safari/iOS bloquea cookies
+// cross-site cuando web y API viven en dominios distintos (*.up.railway.app).
+// Guardamos el JWT que devuelve el login y lo enviamos como Authorization;
+// el API acepta cualquiera de los dos.
+const TOKEN_KEY = 'bsk_token';
+
+export function setAuthToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // localStorage puede no estar disponible (modo privado antiguo); la cookie sigue siendo el plan A.
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
 type Json = Record<string, unknown> | unknown[];
 
 interface RequestOptions {
@@ -36,7 +61,10 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
 export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const res = await fetch(buildUrl(path, opts.query), {
     method: opts.method ?? 'GET',
-    headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: {
+      ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
+      ...authHeaders(),
+    },
     body: opts.body ? JSON.stringify(opts.body) : undefined,
     credentials: 'include',
     signal: opts.signal,
@@ -61,6 +89,7 @@ export async function apiUpload<T>(path: string, file: File, query?: RequestOpti
   form.append('file', file);
   const res = await fetch(buildUrl(path, query), {
     method: 'POST',
+    headers: authHeaders(),
     body: form,
     credentials: 'include',
   });
@@ -81,7 +110,7 @@ export function apiAssetUrl(path: string): string {
 
 // Descarga un archivo (reporte/PDF) respetando cookies de sesión.
 export async function apiDownload(path: string, filename: string, query?: RequestOptions['query']): Promise<void> {
-  const res = await fetch(buildUrl(path, query), { credentials: 'include' });
+  const res = await fetch(buildUrl(path, query), { credentials: 'include', headers: authHeaders() });
   if (!res.ok) {
     const p = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new ApiError(res.status, 'download_error', p?.message ?? 'No se pudo descargar el archivo');

@@ -97,11 +97,13 @@ export default async function riferosRoutes(app: FastifyInstance): Promise<void>
     }
 
     // Reissue de sesión con riferoId para que requireRifero funcione sin re-login.
-    await setSession(reply, { sub: auth.userId, role: auth.role, riferoId: profile.id });
+    // El token va también en el body (fallback Bearer cuando las cookies
+    // cross-site están bloqueadas, p. ej. Safari/iOS).
+    const token = await setSession(reply, { sub: auth.userId, role: auth.role, riferoId: profile.id });
     await logActivity({ userId: auth.userId, type: 'RAFFLE', action: 'onboarding', meta: { slug: profile.slug } });
 
     const ctx = await getPlanContext(profile.id);
-    return reply.code(201).send({ profile: toRiferoProfileDTO(profile, ctx) });
+    return reply.code(201).send({ profile: toRiferoProfileDTO(profile, ctx), token });
   });
 
   // GET /riferos/me

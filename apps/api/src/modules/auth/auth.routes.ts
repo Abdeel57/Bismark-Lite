@@ -40,9 +40,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
     });
 
     await logActivity({ userId: user.id, type: 'AUTH', action: 'register', ip: request.ip });
-    await setSession(reply, { sub: user.id, role: user.role, riferoId: null });
+    // El token también viaja en el body: fallback Bearer para navegadores que
+    // bloquean cookies cross-site (Safari/iOS) mientras web y API viven en
+    // dominios distintos (*.up.railway.app).
+    const token = await setSession(reply, { sub: user.id, role: user.role, riferoId: null });
 
-    return reply.code(201).send({ user: toAuthUserDTO(user, null) });
+    return reply.code(201).send({ user: toAuthUserDTO(user, null), token });
   });
 
   // POST /auth/login
@@ -61,9 +64,9 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
     if (!ok) throw unauthorized('Correo o contraseña incorrectos');
 
     await logActivity({ userId: user.id, type: 'AUTH', action: 'login', ip: request.ip });
-    await setSession(reply, { sub: user.id, role: user.role, riferoId: user.riferoProfile?.id ?? null });
+    const token = await setSession(reply, { sub: user.id, role: user.role, riferoId: user.riferoProfile?.id ?? null });
 
-    return reply.send({ user: toAuthUserDTO(user, user.riferoProfile) });
+    return reply.send({ user: toAuthUserDTO(user, user.riferoProfile), token });
   });
 
   // POST /auth/logout

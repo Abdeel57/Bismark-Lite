@@ -86,8 +86,11 @@ function renderOgHtml(d: OgData): string {
 </html>`;
 }
 
-function sendOg(reply: FastifyReply, html: string): void {
-  reply
+// IMPORTANTE: el handler async debe RETORNAR esta promesa (return sendOg(...)).
+// Si se llama sin return, el `return undefined` implícito del handler compite
+// con el stream de @fastify/compress y la respuesta sale gzip con cuerpo vacío.
+function sendOg(reply: FastifyReply, html: string): FastifyReply {
+  return reply
     .header('Content-Type', 'text/html; charset=utf-8')
     .header('Cache-Control', 'public, max-age=300') // 5 min: equilibra frescura y caché de crawlers
     .send(html);
@@ -108,18 +111,16 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
     const shareUrl = `${env.publicApiUrl || `${request.protocol}://${request.headers.host ?? ''}`}/s/r/${encodeURIComponent(slug)}`;
 
     if (!profile || profile.status === 'DELETED') {
-      reply
-        .header('Content-Type', 'text/html; charset=utf-8')
-        .send(
-          renderOgHtml({
-            title: 'Bismark — Rifas y sorteos',
-            description: 'Crea tu página de rifas y administra tus boletos desde el celular.',
-            image: null,
-            url: shareUrl,
-            redirectUrl: env.publicWebUrl,
-          }),
-        );
-      return;
+      return sendOg(
+        reply,
+        renderOgHtml({
+          title: 'Bismark — Rifas y sorteos',
+          description: 'Crea tu página de rifas y administra tus boletos desde el celular.',
+          image: null,
+          url: shareUrl,
+          redirectUrl: env.publicWebUrl,
+        }),
+      );
     }
 
     const ctx = await getPlanContext(profile.id);
@@ -134,7 +135,7 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
       url: shareUrl,
       redirectUrl: inactive ? env.publicWebUrl : redirectUrl,
     });
-    sendOg(reply, html);
+    return sendOg(reply, html);
   });
 
   // GET /s/r/:slug/:eventNumber — vista previa de una rifa
@@ -149,7 +150,7 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
     });
 
     if (!profile || Number.isNaN(n)) {
-      sendOg(
+      return sendOg(
         reply,
         renderOgHtml({
           title: 'Bismark — Rifas y sorteos',
@@ -159,7 +160,6 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
           redirectUrl: env.publicWebUrl,
         }),
       );
-      return;
     }
 
     const raffle = await prisma.raffle.findFirst({
@@ -171,7 +171,7 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
     const raffleUrl = toAbsoluteWebUrl(rafflePublicPath(profile.slug, n, PUBLIC_URL_CFG));
 
     if (!raffle || inactive) {
-      sendOg(
+      return sendOg(
         reply,
         renderOgHtml({
           title: `${profile.publicName} — Rifas y sorteos`,
@@ -181,7 +181,6 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
           redirectUrl: inactive ? env.publicWebUrl : toAbsoluteWebUrl(riferoPublicUrl(profile.slug, PUBLIC_URL_CFG)),
         }),
       );
-      return;
     }
 
     const priceLine = `Boletos desde $${raffle.ticketPrice.toLocaleString('es-MX')} MXN`;
@@ -189,7 +188,7 @@ export default async function ogRoutes(app: FastifyInstance): Promise<void> {
       ? `🎁 ${raffle.prize}. ${priceLine}. ¡Aparta el tuyo!`
       : raffle.description?.slice(0, 200) || `${priceLine}. ¡Aparta tus boletos!`;
 
-    sendOg(
+    return sendOg(
       reply,
       renderOgHtml({
         title: `${raffle.title} — ${profile.publicName}`,

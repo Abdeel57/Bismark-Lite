@@ -67,6 +67,17 @@ export interface SubscriptionDTO {
   createdAt: string;
 }
 
+// Método de pago del rifero (lista por perfil, persistida como JSON).
+export interface PaymentMethodDTO {
+  id: string;
+  bank: string;
+  holderName?: string | null;
+  clabe?: string | null;
+  cardNumber?: string | null;
+  concept?: string | null;
+  instructions?: string | null;
+}
+
 export interface RiferoProfileDTO {
   id: string;
   userId: string;
@@ -93,6 +104,7 @@ export interface RiferoProfileDTO {
   payConcept: string | null;
   payInstructions: string | null;
   payWhatsapp: string | null;
+  paymentMethods: PaymentMethodDTO[];
   defaultReserveMinutes: number;
   allowProofUpload: boolean;
   showWinners: boolean;
@@ -192,6 +204,7 @@ export interface PublicRaffleDTO extends RaffleDTO {
     concept: string | null;
     instructions: string | null;
     whatsapp: string | null;
+    methods?: PaymentMethodDTO[];
   };
 }
 

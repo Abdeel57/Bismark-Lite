@@ -11,7 +11,8 @@ import { track, identify } from '@/lib/analytics';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
+import { TicketField, ticketInputClass } from '@/components/ui/ticket-field';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 
@@ -51,10 +52,11 @@ export default function Login() {
 
   return (
     <AuthLayout
+      ticketLabel="Boleto de acceso"
       badge="Bienvenido de nuevo"
       sideTitle={
         <>
-          Tus rifas, <span className="text-brand-gold">bajo control</span>
+          Tus rifas, <span className="text-brand-mint">bajo control</span>
         </>
       }
       sideSubtitle="Administra boletos, órdenes, pagos y sorteos desde un solo panel, directo en tu celular."
@@ -71,50 +73,39 @@ export default function Login() {
       </div>
 
       <form onSubmit={handleSubmit((data) => loginMutation.mutate(data))} className="space-y-4" noValidate>
-        <div>
-          <Label htmlFor="email">Correo electrónico</Label>
-          <div className="relative">
-            <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="tucorreo@ejemplo.com"
-              className="pl-10"
-              {...register('email')}
-            />
-          </div>
-          {errors.email && <p className="mt-1 text-sm text-destructive">{errors.email.message}</p>}
-        </div>
+        <TicketField label="Correo electrónico" htmlFor="email" icon={Mail} error={errors.email?.message}>
+          <Input
+            id="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            placeholder="tucorreo@ejemplo.com"
+            className={ticketInputClass}
+            {...register('email')}
+          />
+        </TicketField>
 
-        <div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password" className="mb-1.5">
-              Contraseña
-            </Label>
-            <Link
-              to="/recuperar"
-              className="mb-1.5 text-xs font-semibold text-brand hover:underline"
-            >
+        <TicketField
+          label="Contraseña"
+          htmlFor="password"
+          icon={Lock}
+          error={errors.password?.message}
+          right={
+            <Link to="/recuperar" className="text-xs font-semibold text-brand hover:underline">
               ¿Olvidaste tu contraseña?
             </Link>
-          </div>
-          <div className="relative">
-            <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="Tu contraseña"
-              className="pl-10"
-              {...register('password')}
-            />
-          </div>
-          {errors.password && <p className="mt-1 text-sm text-destructive">{errors.password.message}</p>}
-        </div>
+          }
+        >
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            placeholder="Tu contraseña"
+            className={ticketInputClass}
+            {...register('password')}
+          />
+        </TicketField>
 
-        <Button type="submit" variant="brand" size="lg" className="w-full rounded-xl" loading={loginMutation.isPending}>
+        <Button type="submit" variant="brand" size="lg" className="w-full rounded-full" loading={loginMutation.isPending}>
           Entrar <ArrowRight className="h-5 w-5" />
         </Button>
       </form>

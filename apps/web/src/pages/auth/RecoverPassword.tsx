@@ -23,7 +23,7 @@ const SIDE = {
   badge: 'Recupera tu cuenta',
   sideTitle: (
     <>
-      Vuelve a tomar <span className="text-brand-gold">el control</span>
+      Vuelve a tomar <span className="text-brand-mint">el control</span>
     </>
   ),
   sideSubtitle: 'Te enviamos un enlace seguro a tu correo para que crees una nueva contraseña en segundos.',

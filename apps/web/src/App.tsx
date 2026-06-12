@@ -18,6 +18,8 @@ const Register = lazy(() => import('@/pages/auth/Register'));
 const RecoverPassword = lazy(() => import('@/pages/auth/RecoverPassword'));
 const Onboarding = lazy(() => import('@/pages/onboarding/Onboarding'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
+const Terms = lazy(() => import('@/pages/legal/Terms'));
+const Privacy = lazy(() => import('@/pages/legal/Privacy'));
 
 const PublicRifero = lazy(() => import('@/pages/public/PublicRifero'));
 const PublicRaffle = lazy(() => import('@/pages/public/PublicRaffle'));
@@ -82,6 +84,8 @@ function MainApp() {
         <Route path="/registro" element={<RequireGuest><Register /></RequireGuest>} />
         <Route path="/recuperar" element={<RequireGuest><RecoverPassword /></RequireGuest>} />
         <Route path="/onboarding" element={<RequireAuth><Onboarding /></RequireAuth>} />
+        <Route path="/terminos" element={<Terms />} />
+        <Route path="/privacidad" element={<Privacy />} />
 
         {/* Páginas públicas (fallback local por ruta) */}
         <Route path="/r/:slug" element={<PublicRifero />} />

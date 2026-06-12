@@ -191,6 +191,9 @@ model RiferoProfile {
   payConcept      String?
   payInstructions String?
   payWhatsapp     String?
+  // Varios métodos de pago (lista JSON de PaymentMethodDTO); los campos pay* de
+  // arriba quedan como compatibilidad (espejo del primer método).
+  paymentMethods  Json?
 
   // Configuración operativa
   defaultReserveMinutes Int     @default(120) // tiempo de apartado por defecto

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -12,15 +13,18 @@ import {
   FileBarChart,
   ChevronRight,
   Sparkles,
+  Check,
   type LucideIcon,
 } from 'lucide-react';
 import { formatMXN } from '@bismark/shared';
 import { raffleService } from '@/services/raffles';
 import { riferoService } from '@/services/riferos';
 import { useAuthStore } from '@/store/auth';
+import { buildRiferoUrl } from '@/lib/site';
 import { PageLoader } from '@/components/ui/misc';
 import { PanelHeader, StatTile, SectionLabel, PANEL_CARD } from '@/components/owner/PanelKit';
 import { cn } from '@/lib/cn';
+import { toast } from 'sonner';
 
 const QUICK_ACTIONS: { to: string; label: string; icon: LucideIcon; accent?: boolean }[] = [
   { to: '/panel/admin/rifas/nueva', label: 'Nueva rifa', icon: Plus, accent: true },
@@ -29,9 +33,63 @@ const QUICK_ACTIONS: { to: string; label: string; icon: LucideIcon; accent?: boo
   { to: '/panel/admin/reportes', label: 'Reportes', icon: FileBarChart },
 ];
 
+const SHARED_KEY = 'bsk-shared-page';
+
+// ── Checklist de primeros pasos ──────────────────────────────
+// Guía al rifero nuevo: pagos → crear → publicar → compartir. Se oculta sola
+// cuando los 4 pasos están completos.
+function StepRow({
+  n,
+  title,
+  desc,
+  done,
+  to,
+  onClick,
+}: {
+  n: number;
+  title: string;
+  desc: string;
+  done: boolean;
+  to?: string;
+  onClick?: () => void;
+}) {
+  const body = (
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-xl border px-3.5 py-3 transition-colors',
+        done ? 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-900 dark:bg-emerald-950/30' : 'bg-card hover:border-primary/40',
+      )}
+    >
+      <span
+        className={cn(
+          'grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-extrabold',
+          done ? 'bg-emerald-500 text-white' : 'bg-primary/10 text-primary',
+        )}
+      >
+        {done ? <Check className="h-4 w-4" /> : n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={cn('text-sm font-bold leading-tight', done && 'text-emerald-700 line-through decoration-emerald-400 dark:text-emerald-400')}>
+          {title}
+        </p>
+        {!done && <p className="text-xs text-muted-foreground">{desc}</p>}
+      </div>
+      {!done && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+    </div>
+  );
+  if (done) return body;
+  if (to) return <Link to={to}>{body}</Link>;
+  return (
+    <button type="button" onClick={onClick} className="block w-full text-left">
+      {body}
+    </button>
+  );
+}
+
 export default function Home() {
   const user = useAuthStore((s) => s.user);
   const firstName = user?.name?.split(' ')[0] ?? 'rifero';
+  const [shared, setShared] = useState(() => !!localStorage.getItem(SHARED_KEY));
 
   const summaryQuery = useQuery({
     queryKey: ['dashboard-summary'],
@@ -43,8 +101,45 @@ export default function Home() {
     queryFn: riferoService.me,
   });
 
+  const rafflesQuery = useQuery({
+    queryKey: ['raffles'],
+    queryFn: () => raffleService.list(),
+  });
+
   const summary = summaryQuery.data?.summary;
-  const hasActivePlan = profileQuery.data?.profile.hasActivePlan ?? true;
+  const profile = profileQuery.data?.profile;
+  const hasActivePlan = profile?.hasActivePlan ?? true;
+  const raffles = rafflesQuery.data?.items ?? [];
+
+  // Estado de los primeros pasos
+  const hasPayment = (profile?.paymentMethods?.length ?? 0) > 0;
+  const hasRaffle = raffles.length > 0;
+  const hasPublished = raffles.some((r) => r.status === 'PUBLISHED' || r.status === 'FINISHED');
+  const allDone = hasPayment && hasRaffle && hasPublished && shared;
+  const setupLoaded = !profileQuery.isLoading && !rafflesQuery.isLoading;
+
+  const sharePage = () => {
+    if (!profile) return;
+    const url = buildRiferoUrl(profile.slug);
+    const finish = () => {
+      localStorage.setItem(SHARED_KEY, '1');
+      setShared(true);
+    };
+    if (navigator.share) {
+      navigator
+        .share({ title: profile.publicName, text: `Participa en mis rifas: ${url}`, url })
+        .then(finish)
+        .catch(() => {});
+      return;
+    }
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        toast.success('Link copiado. ¡Pégalo en tus redes o WhatsApp!');
+        finish();
+      })
+      .catch(() => toast.error('No se pudo copiar el link'));
+  };
 
   return (
     <div>
@@ -65,6 +160,48 @@ export default function Home() {
         </Link>
       )}
 
+      {/* ── Primeros pasos (desaparece al completarse) ── */}
+      {setupLoaded && !allDone && (
+        <div className={cn(PANEL_CARD, 'mb-5 p-4')}>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-display text-sm font-extrabold uppercase tracking-wide">Primeros pasos</p>
+            <span className="font-ticket text-xs font-bold text-muted-foreground">
+              {[hasPayment, hasRaffle, hasPublished, shared].filter(Boolean).length}/4
+            </span>
+          </div>
+          <div className="space-y-2">
+            <StepRow
+              n={1}
+              title="Configura tus datos de pago"
+              desc="A qué cuenta te pagan tus compradores."
+              done={hasPayment}
+              to="/panel/admin/pagos"
+            />
+            <StepRow
+              n={2}
+              title="Crea tu primera rifa"
+              desc="Premio, boletos, precio y fecha del sorteo."
+              done={hasRaffle}
+              to="/panel/admin/rifas/nueva"
+            />
+            <StepRow
+              n={3}
+              title="Publícala"
+              desc="Hazla visible para tus compradores."
+              done={hasPublished}
+              to="/panel/admin/rifas"
+            />
+            <StepRow
+              n={4}
+              title="Comparte tu link"
+              desc="Mándalo por WhatsApp o súbelo a tus redes."
+              done={shared}
+              onClick={sharePage}
+            />
+          </div>
+        </div>
+      )}
+
       {summaryQuery.isLoading ? (
         <PageLoader />
       ) : (
@@ -72,16 +209,16 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <StatTile
               icon={Receipt}
-              label="Órdenes pendientes"
+              label="Por cobrar"
               value={summary?.pendingOrders ?? 0}
               to="/panel/admin/ordenes/pendientes"
               accent
             />
-            <StatTile icon={CheckCircle2} label="Órdenes pagadas" value={summary?.paidOrders ?? 0} />
-            <StatTile icon={Ticket} label="Boletos vendidos" value={summary?.soldTickets ?? 0} />
-            <StatTile icon={Wallet} label="Ingresos estimados" value={formatMXN(summary?.estimatedRevenue ?? 0)} />
+            <StatTile icon={CheckCircle2} label="Pagadas" value={summary?.paidOrders ?? 0} />
+            <StatTile icon={Ticket} label="Vendidos" value={summary?.soldTickets ?? 0} />
+            <StatTile icon={Wallet} label="Ingresos" value={formatMXN(summary?.estimatedRevenue ?? 0)} />
             <StatTile icon={Megaphone} label="Rifas activas" value={summary?.activeRaffles ?? 0} />
-            <StatTile icon={CalendarClock} label="Próximos sorteos" value={summary?.upcomingDraws ?? 0} />
+            <StatTile icon={CalendarClock} label="Sorteos" value={summary?.upcomingDraws ?? 0} />
           </div>
 
           <SectionLabel>Accesos rápidos</SectionLabel>

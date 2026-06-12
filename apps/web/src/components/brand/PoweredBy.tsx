@@ -1,4 +1,5 @@
 import { BRAND } from '@bismark/shared';
+import { LogoMark } from './LogoMark';
 import { cn } from '@/lib/cn';
 
 // Marca discreta para páginas públicas de riferos.
@@ -11,7 +12,7 @@ export function PoweredBy({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="grid h-4 w-4 place-items-center rounded bg-brand text-[9px] font-black text-white">B</span>
+      <LogoMark className="h-4 w-4" />
       {BRAND.poweredBy}
     </a>
   );

@@ -11,6 +11,8 @@ import {
 } from '@bismark/shared';
 import { raffleService } from '@/services/raffles';
 import { uploadService } from '@/services/uploads';
+import { useAuthStore } from '@/store/auth';
+import { buildRaffleUrl } from '@/lib/site';
 import { ApiError, apiAssetUrl } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
@@ -62,6 +64,9 @@ export default function RaffleForm() {
   const [uploading, setUploading] = useState(false);
   const [drawLocal, setDrawLocal] = useState('');
   const [drawError, setDrawError] = useState<string | undefined>(undefined);
+  // Rifa recién creada → pantalla de éxito (publicar / ver / compartir).
+  const [created, setCreated] = useState<RaffleDTO | null>(null);
+  const slug = useAuthStore((s) => s.user?.slug) ?? undefined;
 
   const {
     register,
@@ -126,16 +131,50 @@ export default function RaffleForm() {
   const save = useMutation({
     mutationFn: (input: CreateRaffleInput) =>
       isEdit ? raffleService.update(id as string, input) : raffleService.create(input),
-    onSuccess: () => {
-      toast.success(isEdit ? 'Rifa actualizada' : 'Rifa creada. Se le asignó su número de evento.');
+    onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: ['raffles'] });
-      if (isEdit) void queryClient.invalidateQueries({ queryKey: ['raffle', id] });
-      navigate('/panel/admin/rifas');
+      if (isEdit) {
+        toast.success('Rifa actualizada');
+        void queryClient.invalidateQueries({ queryKey: ['raffle', id] });
+        navigate('/panel/admin/rifas');
+        return;
+      }
+      // Al crear: pantalla de éxito con el siguiente paso claro (publicar).
+      setCreated(res.raffle);
     },
     onError: (e) => {
       toast.error(e instanceof ApiError ? e.message : 'No se pudo guardar la rifa');
     },
   });
+
+  const publishNow = useMutation({
+    mutationFn: (raffleId: string) => raffleService.publish(raffleId),
+    onSuccess: (res) => {
+      toast.success('¡Publicada! Tu rifa ya está visible para tus compradores.');
+      setCreated(res.raffle);
+      void queryClient.invalidateQueries({ queryKey: ['raffles'] });
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 402) {
+        toast.error(e.message, { description: 'Activa un plan para publicar tus rifas.' });
+        return;
+      }
+      toast.error(e instanceof ApiError ? e.message : 'No se pudo publicar la rifa');
+    },
+  });
+
+  const shareCreated = () => {
+    if (!created || !slug) return;
+    const url = buildRaffleUrl(slug, created.eventNumber);
+    if (navigator.share) {
+      void navigator.share({ title: created.title, text: `Participa en mi rifa "${created.title}": ${url}`, url }).catch(() => {});
+      return;
+    }
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success('Link copiado. ¡Compártelo!'))
+      .catch(() => toast.error('No se pudo copiar el link'));
+  };
 
   const onSubmit = handleSubmit((values) => {
     // La fecha del sorteo es obligatoria: de ella depende la cuenta regresiva.
@@ -190,6 +229,60 @@ export default function RaffleForm() {
   }
 
   if (isEdit && loadingRaffle) return <PageLoader label="Cargando rifa..." />;
+
+  // ── Pantalla de éxito tras crear: conecta crear → publicar → compartir ──
+  if (created) {
+    const isLive = created.status === 'PUBLISHED';
+    const publicUrl = slug ? buildRaffleUrl(slug, created.eventNumber) : null;
+    return (
+      <div className="mx-auto max-w-xl">
+        <FormSection
+          title={isLive ? '¡Tu rifa está publicada! 🎉' : '¡Tu rifa está lista!'}
+          description={
+            isLive
+              ? 'Ya es visible para tus compradores. Compártela para empezar a vender.'
+              : 'Se guardó como borrador. Publícala cuando quieras que tus compradores la vean.'
+          }
+        >
+          <div className="rounded-xl border bg-muted/40 px-4 py-3">
+            <p className="font-ticket text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              {created.eventLabel}
+            </p>
+            <p className="font-display text-lg font-extrabold leading-tight">{created.title}</p>
+          </div>
+
+          <div className="space-y-2.5">
+            {!isLive && (
+              <Button
+                variant="brand"
+                size="lg"
+                className="w-full rounded-xl"
+                loading={publishNow.isPending}
+                onClick={() => publishNow.mutate(created.id)}
+              >
+                Publicar ahora
+              </Button>
+            )}
+            {isLive && (
+              <Button variant="brand" size="lg" className="w-full rounded-xl" onClick={shareCreated}>
+                Compartir mi rifa
+              </Button>
+            )}
+            {publicUrl && isLive && (
+              <Button asChild variant="outline" size="lg" className="w-full rounded-xl">
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer">
+                  Ver cómo se ve
+                </a>
+              </Button>
+            )}
+            <Button variant="ghost" size="lg" className="w-full rounded-xl" onClick={() => navigate('/panel/admin/rifas')}>
+              Ir a mis rifas
+            </Button>
+          </div>
+        </FormSection>
+      </div>
+    );
+  }
 
   const exampleTicket = formatTicketNumber(ticketStart, ticketFormat);
   const progress = ((step + 1) / STEPS.length) * 100;

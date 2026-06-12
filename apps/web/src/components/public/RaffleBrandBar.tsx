@@ -118,12 +118,11 @@ export function RaffleBrandBar({
               </div>
             )}
             {verified && (
-              <span
-                className="absolute grid place-items-center rounded-full bg-white p-0.5 shadow"
+              <VerifiedBadge
+                size={17}
+                className="absolute drop-shadow-[0_1px_4px_rgba(0,0,0,0.45)]"
                 style={{ top: badgeTopPx, right: -4 }}
-              >
-                <VerifiedBadge size={15} />
-              </span>
+              />
             )}
           </div>
         </Link>

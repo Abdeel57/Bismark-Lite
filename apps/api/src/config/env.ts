@@ -1,4 +1,16 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+
+// Carga de variables de entorno. Prioridad (de mayor a menor):
+//   1. Variables ya presentes en el proceso (las que inyecta Railway / el SO).
+//   2. .env             — overrides locales (NO versionado; solo desarrollo).
+//   3. .env.production  — valores NO secretos versionados en el repo (solo prod).
+// dotenv nunca sobreescribe una variable ya definida, así que el dashboard de
+// Railway siempre gana y los secretos viven únicamente ahí.
+loadEnv();
+if (process.env.NODE_ENV === 'production') {
+  loadEnv({ path: fileURLToPath(new URL('../../.env.production', import.meta.url)) });
+}
 
 function str(key: string, fallback?: string): string {
   const v = process.env[key];

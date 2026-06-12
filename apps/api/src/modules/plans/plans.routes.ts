@@ -46,7 +46,7 @@ export default async function plansRoutes(app: FastifyInstance): Promise<void> {
       },
     });
     await logActivity({ userId: request.auth!.userId, type: 'ADMIN', action: 'create_plan', meta: { planId: plan.id } });
-    reply.code(201).send({ plan: toPlanDTO(plan) });
+    return reply.code(201).send({ plan: toPlanDTO(plan) });
   });
 
   // PATCH /admin/plans/:id

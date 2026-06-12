@@ -32,3 +32,14 @@ export function buildRiferoUrl(slug: string): string {
 export function buildRaffleUrl(slug: string, eventNumber: number): string {
   return `${buildRiferoUrl(slug)}/e${eventNumber}`;
 }
+
+// URL de la landing principal de Bismark (donde está toda la info de la
+// plataforma). Desde un subdominio de rifero, la ruta "/" es el perfil del
+// rifero, así que la landing vive en el dominio raíz.
+export function buildHomeUrl(): string {
+  if (detectRiferoSubdomain()) {
+    const proto = window.location.protocol;
+    return `${proto}//${webEnv.rootDomain}`;
+  }
+  return '/';
+}

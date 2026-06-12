@@ -93,7 +93,7 @@ export default function RiferoPayment() {
 
           {/* ── Verificador del boleto (con los colores del rifero) ── */}
           <div className="overflow-hidden rounded-3xl bg-card shadow-xl ring-1 ring-border">
-            <div className="bg-[var(--rifero-primary,#2751fb)] px-6 py-5 text-white">
+            <div className="bg-[var(--rifero-primary,#1A4DFF)] px-6 py-5 text-white">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-2 text-sm font-semibold opacity-90">
                   <TicketIcon className="h-4 w-4" /> Boleto digital
@@ -116,7 +116,7 @@ export default function RiferoPayment() {
                 {ticket.ticketNumbers.map((n) => (
                   <span
                     key={n}
-                    className="rounded-lg bg-muted px-3 py-1.5 text-lg font-extrabold tabular-nums text-[var(--rifero-primary,#2751fb)]"
+                    className="rounded-lg bg-muted px-3 py-1.5 text-lg font-extrabold tabular-nums text-[var(--rifero-primary,#1A4DFF)]"
                   >
                     {n}
                   </span>

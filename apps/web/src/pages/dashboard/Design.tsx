@@ -19,7 +19,7 @@ const TEMPLATES = [
   { value: 'classic', label: 'Clásico' },
   { value: 'moderno', label: 'Moderno' },
 ];
-const DEFAULT_PRIMARY = '#2751fb';
+const DEFAULT_PRIMARY = '#1A4DFF';
 const DEFAULT_SECONDARY = '#0f172a';
 
 interface DesignState {

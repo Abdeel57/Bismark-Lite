@@ -44,14 +44,17 @@ export default {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
         },
-        // Marca Bismark (landing)
+        // Paleta oficial Bismark (bismarkdigital.com): azul eléctrico sobre
+        // blanco/tinta, menta como acento de "suerte" y cielo para detalles.
         brand: {
-          DEFAULT: '#2751fb',
-          electric: '#3b63ff',
-          deep: '#1733c4',
-          ink: '#070b18',
-          gold: '#ffb627',
-          dark: '#0b1220',
+          DEFAULT: '#1A4DFF',
+          electric: '#4178FF',
+          deep: '#0E37D6',
+          ink: '#0A0A0A',
+          sky: '#6FA0FF',
+          mint: '#4DFFA3',
+          gold: '#F5A623', // ámbar puntual (premios); ya no es color de identidad
+          dark: '#0F1116',
         },
         // Estados de boleto (TicketGrid)
         ticket: {
@@ -72,6 +75,8 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
         display: ['"Bricolage Grotesque"', 'Georgia', 'serif'],
+        // Titulares de impacto (hero): grotesca expandida, ancha y pesada.
+        wide: ['"Archivo"', 'Inter', 'system-ui', 'sans-serif'],
         body: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
         ticket: ['"Space Mono"', 'ui-monospace', 'monospace'],
       },

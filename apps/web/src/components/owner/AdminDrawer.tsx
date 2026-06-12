@@ -1,6 +1,6 @@
 import { useEffect, useState, Suspense } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Receipt, Ticket, Menu, type LucideIcon } from 'lucide-react';
+import { Home, Receipt, Ticket, Menu, type LucideIcon } from 'lucide-react';
 import { PageLoader } from '@/components/ui/misc';
 import { cn } from '@/lib/cn';
 import { useNotificationsSummary } from '@/lib/pwa/useNotificationsSummary';
@@ -15,7 +15,7 @@ function sectionTitle(pathname: string): string {
   if (pathname.startsWith('/panel/admin/reportes')) return 'Reportes';
   if (pathname.startsWith('/panel/admin/plan')) return 'Mi plan';
   if (pathname.startsWith('/panel/admin/configuracion')) return 'Ajustes';
-  if (pathname.startsWith('/panel/admin/inicio')) return 'Resumen';
+  if (pathname.startsWith('/panel/admin/inicio')) return 'Inicio';
   return 'Administrador';
 }
 
@@ -80,11 +80,13 @@ export function AdminDrawer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const onInicio = location.pathname.startsWith('/panel/admin/inicio');
   const onOrdenes = location.pathname.startsWith('/panel/admin/ordenes');
   const onRifas = location.pathname.startsWith('/panel/admin/rifas');
+  const inicioActive = !moreOpen && onInicio;
   const ordenesActive = !moreOpen && onOrdenes;
   const rifasActive = !moreOpen && onRifas;
-  const masActive = moreOpen || (!onOrdenes && !onRifas);
+  const masActive = moreOpen || (!onInicio && !onOrdenes && !onRifas);
 
   const goTab = (to: string) => {
     setMoreOpen(false);
@@ -127,8 +129,9 @@ export function AdminDrawer() {
           )}
         </div>
 
-        {/* Menú inferior: 3 pestañas (único lugar con iconos) */}
+        {/* Menú inferior: 4 pestañas (único lugar con iconos) */}
         <nav className="flex h-16 shrink-0 items-stretch border-t bg-background/95 backdrop-blur safe-bottom">
+          <Tab label="Inicio" icon={Home} active={inicioActive} onClick={() => goTab('/panel/admin/inicio')} />
           <Tab label="Órdenes" icon={Receipt} active={ordenesActive} badge={pendingTotal} onClick={() => goTab('/panel/admin/ordenes')} />
           <Tab label="Rifas" icon={Ticket} active={rifasActive} onClick={() => goTab('/panel/admin/rifas')} />
           <Tab label="Más" icon={Menu} active={masActive} onClick={() => setMoreOpen(true)} />

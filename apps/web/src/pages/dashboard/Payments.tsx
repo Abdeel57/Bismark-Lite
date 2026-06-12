@@ -1,10 +1,7 @@
-import { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
-import { Info, Lock } from 'lucide-react';
-import { updateRiferoSchema } from '@bismark/shared';
+import { Info, Lock, Plus, Trash2 } from 'lucide-react';
+import { paymentMethodSchema, type PaymentMethodInput } from '@bismark/shared';
 import { riferoService } from '@/services/riferos';
 import { ApiError } from '@/lib/api';
 import { PageHeader } from '@/components/layout/DashboardLayout';
@@ -14,19 +11,109 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { PageLoader } from '@/components/ui/misc';
+import { BankCard } from '@/components/public/BankCard';
+import { BANKS } from '@/lib/banks';
 import { toast } from 'sonner';
 
-const paymentsFormSchema = updateRiferoSchema.pick({
-  payHolderName: true,
-  payBank: true,
-  payClabe: true,
-  payCardNumber: true,
-  payConcept: true,
-  payInstructions: true,
-  payWhatsapp: true,
-  allowProofUpload: true,
+const MAX_METHODS = 6;
+
+const emptyMethod = (): PaymentMethodInput => ({
+  id: (crypto.randomUUID?.() ?? `m${Date.now()}`).slice(0, 13),
+  bank: '',
+  holderName: '',
+  clabe: '',
+  cardNumber: '',
+  concept: '',
+  instructions: '',
 });
-type PaymentsForm = z.infer<typeof paymentsFormSchema>;
+
+// Editor de UN método: inputs + vista previa en vivo de la tarjeta del banco.
+function MethodEditor({
+  method,
+  index,
+  onChange,
+  onRemove,
+}: {
+  method: PaymentMethodInput;
+  index: number;
+  onChange: (m: PaymentMethodInput) => void;
+  onRemove: () => void;
+}) {
+  const set = (k: keyof PaymentMethodInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    onChange({ ...method, [k]: e.target.value });
+
+  return (
+    <Card>
+      <CardContent className="p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="font-ticket text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+            Método {String(index + 1).padStart(2, '0')}
+          </p>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Quitar
+          </button>
+        </div>
+
+        {/* Vista previa en vivo */}
+        <div className="mx-auto mb-5 max-w-sm">
+          <BankCard
+            method={{
+              ...method,
+              bank: method.bank || 'Tu banco',
+              holderName: method.holderName || 'NOMBRE DEL TITULAR',
+              instructions: null, // las instrucciones van abajo, no en la preview
+            }}
+          />
+        </div>
+
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <div>
+            <Label htmlFor={`bank-${method.id}`}>Banco o método</Label>
+            <Input
+              id={`bank-${method.id}`}
+              placeholder="BBVA, Banorte, OXXO, Nu…"
+              list="bismark-banks"
+              value={method.bank}
+              onChange={set('bank')}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              La tarjeta toma los colores del banco automáticamente.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor={`holder-${method.id}`}>Titular de la cuenta</Label>
+            <Input id={`holder-${method.id}`} placeholder="José Pérez García" value={method.holderName ?? ''} onChange={set('holderName')} />
+          </div>
+          <div>
+            <Label htmlFor={`clabe-${method.id}`}>CLABE interbancaria</Label>
+            <Input id={`clabe-${method.id}`} inputMode="numeric" placeholder="18 dígitos" value={method.clabe ?? ''} onChange={set('clabe')} />
+          </div>
+          <div>
+            <Label htmlFor={`card-${method.id}`}>Número de tarjeta</Label>
+            <Input id={`card-${method.id}`} inputMode="numeric" placeholder="16 dígitos" value={method.cardNumber ?? ''} onChange={set('cardNumber')} />
+          </div>
+          <div>
+            <Label htmlFor={`concept-${method.id}`}>Concepto / referencia</Label>
+            <Input id={`concept-${method.id}`} placeholder="Ej. Rifa + tu folio" value={method.concept ?? ''} onChange={set('concept')} />
+          </div>
+          <div>
+            <Label htmlFor={`instr-${method.id}`}>Nota de este método (opcional)</Label>
+            <Input
+              id={`instr-${method.id}`}
+              placeholder="Ej. Solo depósitos en efectivo"
+              value={method.instructions ?? ''}
+              onChange={set('instructions')}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Payments() {
   const queryClient = useQueryClient();
@@ -38,68 +125,86 @@ export default function Payments() {
   const profile = data?.profile;
   const planAllowsProof = profile?.activePlan?.allowProofUpload ?? false;
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    formState: { errors, isDirty },
-  } = useForm<PaymentsForm>({
-    resolver: zodResolver(paymentsFormSchema),
-    defaultValues: {
-      payHolderName: '',
-      payBank: '',
-      payClabe: '',
-      payCardNumber: '',
-      payConcept: '',
-      payInstructions: '',
-      payWhatsapp: '',
-      allowProofUpload: false,
-    },
-  });
+  const [methods, setMethods] = useState<PaymentMethodInput[]>([]);
+  const [payWhatsapp, setPayWhatsapp] = useState('');
+  const [payInstructions, setPayInstructions] = useState('');
+  const [allowProofUpload, setAllowProofUpload] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (profile) {
-      reset({
-        payHolderName: profile.payHolderName ?? '',
-        payBank: profile.payBank ?? '',
-        payClabe: profile.payClabe ?? '',
-        payCardNumber: profile.payCardNumber ?? '',
-        payConcept: profile.payConcept ?? '',
-        payInstructions: profile.payInstructions ?? '',
-        payWhatsapp: profile.payWhatsapp ?? '',
-        allowProofUpload: planAllowsProof ? profile.allowProofUpload : false,
-      });
-    }
-  }, [profile, planAllowsProof, reset]);
+    if (!profile || loaded) return;
+    // paymentMethods ya viene con el fallback legado sintetizado por el backend.
+    setMethods(
+      (profile.paymentMethods ?? []).map((m) => ({
+        id: m.id === 'legacy' ? emptyMethod().id : m.id,
+        bank: m.bank ?? '',
+        holderName: m.holderName ?? '',
+        clabe: m.clabe ?? '',
+        cardNumber: m.cardNumber ?? '',
+        concept: m.concept ?? '',
+        instructions: m.instructions ?? '',
+      })),
+    );
+    setPayWhatsapp(profile.payWhatsapp ?? '');
+    setPayInstructions(profile.payInstructions ?? '');
+    setAllowProofUpload(planAllowsProof ? profile.allowProofUpload : false);
+    setLoaded(true);
+  }, [profile, planAllowsProof, loaded]);
+
+  const touch = () => setDirty(true);
 
   const mutation = useMutation({
-    mutationFn: (values: PaymentsForm) => {
-      // No enviar allowProofUpload si el plan no lo permite.
-      const payload = { ...values };
-      if (!planAllowsProof) delete payload.allowProofUpload;
-      return riferoService.update(payload);
+    mutationFn: () => {
+      const first = methods[0];
+      return riferoService.update({
+        paymentMethods: methods,
+        payWhatsapp,
+        payInstructions,
+        ...(planAllowsProof ? { allowProofUpload } : {}),
+        // Espejo del primer método en los campos legados (compatibilidad).
+        payBank: first?.bank ?? '',
+        payHolderName: first?.holderName ?? '',
+        payClabe: first?.clabe ?? '',
+        payCardNumber: first?.cardNumber ?? '',
+        payConcept: first?.concept ?? '',
+      });
     },
     onSuccess: (res) => {
       toast.success('Datos de pago guardados');
       queryClient.setQueryData(['rifero', 'me'], res);
       void queryClient.invalidateQueries({ queryKey: ['rifero', 'me'] });
+      setDirty(false);
     },
     onError: (e) => {
       toast.error(e instanceof ApiError ? e.message : 'Algo salió mal');
     },
   });
 
+  const save = () => {
+    for (let i = 0; i < methods.length; i++) {
+      const r = paymentMethodSchema.safeParse(methods[i]);
+      if (!r.success) {
+        toast.error(`Método ${i + 1}: ${r.error.issues[0]?.message ?? 'datos inválidos'}`);
+        return;
+      }
+    }
+    mutation.mutate();
+  };
+
   if (isLoading) return <PageLoader label="Cargando tus datos de pago..." />;
 
   return (
     <div>
-      <PageHeader
-        title="Datos de pago"
-        description="Configura cómo te van a pagar tus compradores."
-      />
+      <PageHeader title="Datos de pago" description="Configura cómo te van a pagar tus compradores." />
 
-      {/* Aviso importante */}
+      {/* Sugerencias de bancos para el autocompletado */}
+      <datalist id="bismark-banks">
+        {BANKS.map((b) => (
+          <option key={b.id} value={b.name} />
+        ))}
+      </datalist>
+
       <Card className="mb-5 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40">
         <CardContent className="flex gap-3 p-4">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
@@ -113,140 +218,123 @@ export default function Payments() {
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit((v) => mutation.mutate(v))}>
-        <Card className="mb-5">
-          <CardHeader>
-            <CardTitle>Cuenta para recibir pagos</CardTitle>
-            <CardDescription>Estos datos los verá el comprador al apartar boletos.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="payHolderName">Titular de la cuenta</Label>
-              <Input id="payHolderName" placeholder="José Pérez García" {...register('payHolderName')} />
-              {errors.payHolderName && (
-                <p className="text-destructive text-sm mt-1">{errors.payHolderName.message}</p>
-              )}
-            </div>
+      {/* ── Métodos de pago (tarjetas) ── */}
+      <div className="mb-5 space-y-4">
+        {methods.map((m, i) => (
+          <MethodEditor
+            key={m.id}
+            method={m}
+            index={i}
+            onChange={(next) => {
+              setMethods((arr) => arr.map((x) => (x.id === m.id ? next : x)));
+              touch();
+            }}
+            onRemove={() => {
+              setMethods((arr) => arr.filter((x) => x.id !== m.id));
+              touch();
+            }}
+          />
+        ))}
 
-            <div>
-              <Label htmlFor="payBank">Banco</Label>
-              <Input id="payBank" placeholder="BBVA, Banorte, Santander..." {...register('payBank')} />
-              {errors.payBank && <p className="text-destructive text-sm mt-1">{errors.payBank.message}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="payClabe">CLABE interbancaria</Label>
-              <Input
-                id="payClabe"
-                inputMode="numeric"
-                placeholder="18 dígitos"
-                {...register('payClabe')}
-              />
-              {errors.payClabe && <p className="text-destructive text-sm mt-1">{errors.payClabe.message}</p>}
-            </div>
-
-            <div>
-              <Label htmlFor="payCardNumber">Número de tarjeta</Label>
-              <Input
-                id="payCardNumber"
-                inputMode="numeric"
-                placeholder="Para transferencia o depósito"
-                {...register('payCardNumber')}
-              />
-              {errors.payCardNumber && (
-                <p className="text-destructive text-sm mt-1">{errors.payCardNumber.message}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="payConcept">Concepto / referencia</Label>
-              <Input id="payConcept" placeholder="Ej. Rifa + tu folio" {...register('payConcept')} />
-              {errors.payConcept && (
-                <p className="text-destructive text-sm mt-1">{errors.payConcept.message}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="payWhatsapp">WhatsApp para enviar comprobantes</Label>
-              <Input
-                id="payWhatsapp"
-                inputMode="tel"
-                placeholder="55 1234 5678"
-                {...register('payWhatsapp')}
-              />
-              {errors.payWhatsapp && (
-                <p className="text-destructive text-sm mt-1">{errors.payWhatsapp.message}</p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="payInstructions">Instrucciones de pago</Label>
-              <Textarea
-                id="payInstructions"
-                rows={4}
-                placeholder="Ej. Realiza tu transferencia y envíame el comprobante por WhatsApp para confirmar tus boletos."
-                {...register('payInstructions')}
-              />
-              {errors.payInstructions && (
-                <p className="text-destructive text-sm mt-1">{errors.payInstructions.message}</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Comprobantes en la plataforma */}
-        <Card className="mb-5">
-          <CardHeader>
-            <CardTitle>Comprobantes en la plataforma</CardTitle>
-            <CardDescription>
-              Permite que el comprador suba su comprobante de pago directo en su orden.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Controller
-              control={control}
-              name="allowProofUpload"
-              render={({ field }) => (
-                <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">Subir comprobante en su orden</p>
-                    <p className="text-xs text-muted-foreground">
-                      {planAllowsProof
-                        ? 'Si lo activas, el comprador podrá adjuntar la foto de su pago.'
-                        : 'Tu plan actual no incluye esta función.'}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={!!field.value}
-                    onCheckedChange={field.onChange}
-                    disabled={!planAllowsProof}
-                    aria-label="Permitir subir comprobante"
-                  />
-                </div>
-              )}
-            />
-            {!planAllowsProof && (
-              <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                <Lock className="h-3.5 w-3.5" />
-                Mejora tu plan para que tus compradores suban su comprobante en la plataforma.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="sticky bottom-24 z-10">
-          <Button
-            type="submit"
-            size="lg"
-            variant="brand"
-            className="w-full"
-            loading={mutation.isPending}
-            disabled={!isDirty || mutation.isPending}
+        {methods.length < MAX_METHODS && (
+          <button
+            type="button"
+            onClick={() => {
+              setMethods((arr) => [...arr, emptyMethod()]);
+              touch();
+            }}
+            className="grid w-full place-items-center gap-1 rounded-2xl border-2 border-dashed px-4 py-6 text-sm font-semibold text-muted-foreground transition-colors hover:border-brand/50 hover:text-brand"
           >
-            Guardar datos de pago
-          </Button>
-        </div>
-      </form>
+            <Plus className="h-5 w-5" />
+            {methods.length === 0 ? 'Agregar mi primer método de pago' : 'Agregar otro método (banco, OXXO, etc.)'}
+          </button>
+        )}
+      </div>
+
+      {/* ── Generales ── */}
+      <Card className="mb-5">
+        <CardHeader>
+          <CardTitle>Para todos los métodos</CardTitle>
+          <CardDescription>Estos datos aplican sin importar a qué cuenta te paguen.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="payWhatsapp">WhatsApp para enviar comprobantes</Label>
+            <Input
+              id="payWhatsapp"
+              inputMode="tel"
+              placeholder="55 1234 5678"
+              value={payWhatsapp}
+              onChange={(e) => {
+                setPayWhatsapp(e.target.value);
+                touch();
+              }}
+            />
+          </div>
+          <div>
+            <Label htmlFor="payInstructions">Instrucciones generales de pago</Label>
+            <Textarea
+              id="payInstructions"
+              rows={3}
+              placeholder="Ej. Realiza tu transferencia y envíame el comprobante por WhatsApp para confirmar tus boletos."
+              value={payInstructions}
+              onChange={(e) => {
+                setPayInstructions(e.target.value);
+                touch();
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Comprobantes en la plataforma */}
+      <Card className="mb-5">
+        <CardHeader>
+          <CardTitle>Comprobantes en la plataforma</CardTitle>
+          <CardDescription>Permite que el comprador suba su comprobante de pago directo en su orden.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Subir comprobante en su orden</p>
+              <p className="text-xs text-muted-foreground">
+                {planAllowsProof
+                  ? 'Si lo activas, el comprador podrá adjuntar la foto de su pago.'
+                  : 'Tu plan actual no incluye esta función.'}
+              </p>
+            </div>
+            <Switch
+              checked={allowProofUpload}
+              onCheckedChange={(v) => {
+                setAllowProofUpload(v);
+                touch();
+              }}
+              disabled={!planAllowsProof}
+              aria-label="Permitir subir comprobante"
+            />
+          </div>
+          {!planAllowsProof && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              Mejora tu plan para que tus compradores suban su comprobante en la plataforma.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-24 z-10">
+        <Button
+          type="button"
+          size="lg"
+          variant="brand"
+          className="w-full"
+          loading={mutation.isPending}
+          disabled={!dirty || mutation.isPending}
+          onClick={save}
+        >
+          Guardar datos de pago
+        </Button>
+      </div>
     </div>
   );
 }

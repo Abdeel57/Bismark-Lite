@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+﻿import type { FastifyInstance, FastifyReply } from 'fastify';
 import { prisma } from '../../lib/prisma.js';
 import { badRequest } from '../../lib/errors.js';
 import { requireRifero } from '../../middlewares/auth.js';
@@ -22,20 +22,19 @@ async function deliver(
   subtitle: string,
   columns: ReportColumn[],
   rows: ReportRow[],
-): Promise<void> {
+): Promise<FastifyReply> {
   if (format === 'excel') {
     const buf = await buildExcel(title, columns, rows);
-    reply
+    return reply
       .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .header('Content-Disposition', `attachment; filename="${filename}.xlsx"`)
       .send(buf);
-  } else {
-    const buf = await buildPdfTable(title, subtitle, columns, rows);
-    reply
-      .header('Content-Type', 'application/pdf')
-      .header('Content-Disposition', `attachment; filename="${filename}.pdf"`)
-      .send(buf);
   }
+  const buf = await buildPdfTable(title, subtitle, columns, rows);
+  return reply
+    .header('Content-Type', 'application/pdf')
+    .header('Content-Disposition', `attachment; filename="${filename}.pdf"`)
+    .send(buf);
 }
 
 export default async function reportsRoutes(app: FastifyInstance): Promise<void> {
@@ -71,7 +70,7 @@ export default async function reportsRoutes(app: FastifyInstance): Promise<void>
       date: formatDateTimeMX(o.createdAt),
     }));
 
-    await deliver(reply, format, `ordenes-${raffle.eventNumber}`, `Órdenes · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
+    return deliver(reply, format, `ordenes-${raffle.eventNumber}`, `Órdenes · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
   });
 
   // GET /reports/raffles/:id/tickets?format=excel|pdf
@@ -102,7 +101,7 @@ export default async function reportsRoutes(app: FastifyInstance): Promise<void>
       code: t.order?.code ?? '',
     }));
 
-    await deliver(reply, format, `boletos-${raffle.eventNumber}`, `Boletos · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
+    return deliver(reply, format, `boletos-${raffle.eventNumber}`, `Boletos · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
   });
 
   // GET /reports/raffles/:id/buyers?format=excel|pdf
@@ -144,6 +143,6 @@ export default async function reportsRoutes(app: FastifyInstance): Promise<void>
     }));
 
     if (rows.length === 0) throw badRequest('No hay compradores para reportar todavía');
-    await deliver(reply, format, `compradores-${raffle.eventNumber}`, `Compradores · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
+    return deliver(reply, format, `compradores-${raffle.eventNumber}`, `Compradores · ${raffle.title}`, `E${raffle.eventNumber}`, columns, rows);
   });
 }

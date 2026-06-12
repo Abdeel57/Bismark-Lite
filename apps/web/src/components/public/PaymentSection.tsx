@@ -65,7 +65,7 @@ export function PaymentSection({
           </div>
           <div className="text-right">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total a pagar</p>
-            <p className="text-3xl font-extrabold text-[var(--rifero-primary,#2751fb)]">
+            <p className="text-3xl font-extrabold text-[var(--rifero-primary,#1A4DFF)]">
               {formatMXN(ticket.totalAmount)}
             </p>
           </div>
@@ -155,7 +155,7 @@ function ProofUpload({ orderCode }: { orderCode: string }) {
   return (
     <div>
       <label
-        className={`flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl bg-[var(--rifero-primary,#2751fb)] px-5 py-4 text-lg font-extrabold text-white shadow-lg transition active:scale-[0.98] ${
+        className={`flex w-full cursor-pointer items-center justify-center gap-3 rounded-2xl bg-[var(--rifero-primary,#1A4DFF)] px-5 py-4 text-lg font-extrabold text-white shadow-lg transition active:scale-[0.98] ${
           mutation.isPending ? 'pointer-events-none opacity-70' : ''
         }`}
       >

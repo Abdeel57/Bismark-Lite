@@ -40,7 +40,7 @@ async function handleUpload(request: FastifyRequest, reply: FastifyReply, kind: 
   }
 
   const stored = await storage.upload({ buffer, filename: file.filename, mimetype: file.mimetype, folder });
-  reply.code(201).send({ url: stored.url, key: stored.key });
+  return reply.code(201).send({ url: stored.url, key: stored.key });
 }
 
 export default async function uploadsRoutes(app: FastifyInstance): Promise<void> {

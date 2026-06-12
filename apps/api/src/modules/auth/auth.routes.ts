@@ -42,7 +42,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
     await logActivity({ userId: user.id, type: 'AUTH', action: 'register', ip: request.ip });
     await setSession(reply, { sub: user.id, role: user.role, riferoId: null });
 
-    reply.code(201).send({ user: toAuthUserDTO(user, null) });
+    return reply.code(201).send({ user: toAuthUserDTO(user, null) });
   });
 
   // POST /auth/login
@@ -63,13 +63,13 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
     await logActivity({ userId: user.id, type: 'AUTH', action: 'login', ip: request.ip });
     await setSession(reply, { sub: user.id, role: user.role, riferoId: user.riferoProfile?.id ?? null });
 
-    reply.send({ user: toAuthUserDTO(user, user.riferoProfile) });
+    return reply.send({ user: toAuthUserDTO(user, user.riferoProfile) });
   });
 
   // POST /auth/logout
   app.post('/auth/logout', async (_request, reply) => {
     clearSession(reply);
-    reply.send({ ok: true });
+    return reply.send({ ok: true });
   });
 
   // POST /auth/forgot-password — solicita enlace de recuperación.
@@ -98,7 +98,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
         await logActivity({ userId: user.id, type: 'AUTH', action: 'forgot_password', ip: request.ip });
       }
 
-      reply.send({ ok: true });
+      return reply.send({ ok: true });
     },
   );
 
@@ -129,7 +129,7 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
       ]);
 
       await logActivity({ userId: record.userId, type: 'AUTH', action: 'reset_password', ip: request.ip });
-      reply.send({ ok: true });
+      return reply.send({ ok: true });
     },
   );
 
@@ -137,13 +137,12 @@ export default async function authRoutes(app: FastifyInstance): Promise<void> {
   // en vez de 401. Así no ensucia la consola con un 401 en cada página pública.
   app.get('/auth/me', async (request, reply) => {
     if (!request.auth) {
-      reply.send({ user: null });
-      return;
+      return reply.send({ user: null });
     }
     const user = await prisma.user.findUnique({
       where: { id: request.auth.userId },
       include: { riferoProfile: true },
     });
-    reply.send({ user: user ? toAuthUserDTO(user, user.riferoProfile) : null });
+    return reply.send({ user: user ? toAuthUserDTO(user, user.riferoProfile) : null });
   });
 }

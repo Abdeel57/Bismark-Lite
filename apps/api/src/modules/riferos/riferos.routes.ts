@@ -73,7 +73,7 @@ export default async function riferosRoutes(app: FastifyInstance): Promise<void>
     await logActivity({ userId: auth.userId, type: 'RAFFLE', action: 'onboarding', meta: { slug: data.slug } });
 
     const ctx = await getPlanContext(profile.id);
-    reply.code(201).send({ profile: toRiferoProfileDTO(profile, ctx) });
+    return reply.code(201).send({ profile: toRiferoProfileDTO(profile, ctx) });
   });
 
   // GET /riferos/me

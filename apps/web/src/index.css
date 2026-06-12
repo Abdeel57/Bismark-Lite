@@ -97,6 +97,65 @@
       radial-gradient(circle at right center, transparent 7px, #000 8px);
     mask-composite: intersect;
   }
+  /* Flotación sutil del boleto del titular (hero) */
+  @keyframes ticket-float {
+    0%,
+    100% {
+      transform: rotate(-3deg) translateY(0);
+    }
+    50% {
+      transform: rotate(-1.5deg) translateY(-4px);
+    }
+  }
+  .ticket-float {
+    animation: ticket-float 5.5s ease-in-out infinite;
+  }
+
+  /* Micro-animaciones del bento de beneficios (landing) */
+  @keyframes typing-dot {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    30% {
+      transform: translateY(-3px);
+      opacity: 1;
+    }
+  }
+  .typing-dot {
+    animation: typing-dot 1.3s ease-in-out infinite;
+  }
+  @keyframes qr-scan {
+    0% {
+      transform: translateY(-130%);
+    }
+    55%,
+    100% {
+      transform: translateY(300%);
+    }
+  }
+  .qr-scan {
+    animation: qr-scan 2.8s ease-in-out infinite;
+  }
+  @keyframes drum-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .drum-spin {
+    animation: drum-spin 12s linear infinite;
+  }
+  /* Rendimiento: pausa las micro-animaciones cuando la tarjeta no está en
+     pantalla (dispositivos de baja potencia agradecen no animar a ciegas). */
+  .anim-paused .typing-dot,
+  .anim-paused .qr-scan,
+  .anim-paused .drum-spin,
+  .anim-paused .animate-float {
+    animation-play-state: paused;
+  }
+
   /* Desvanecido en los extremos del marquee */
   .marquee-fade {
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
@@ -104,7 +163,7 @@
   }
   /* Gradiente de texto de marca */
   .text-gradient-brand {
-    background: linear-gradient(120deg, #fff 20%, #9db6ff 55%, #2751fb 100%);
+    background: linear-gradient(120deg, #fff 20%, #6fa0ff 55%, #1a4dff 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -118,6 +177,20 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* ── Móvil: campos de formulario siempre ≥16px ───────────────────
+   iOS hace zoom automático al enfocar cualquier control con letra menor a
+   16px, lo que desencuadra la página. Esta regla lo evita en TODOS los
+   campos (incluye buscadores y el editor de texto enriquecido) sin importar
+   la clase de Tailwind que tengan. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea,
+  [contenteditable]:not([contenteditable='false']) {
+    font-size: max(16px, 1em);
   }
 }
 

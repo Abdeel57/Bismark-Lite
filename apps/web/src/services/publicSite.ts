@@ -6,6 +6,7 @@ import type {
   ValidationResultDTO,
   DigitalTicketDTO,
   PaymentProofDTO,
+  PaymentMethodDTO,
   OrderStatus,
 } from '@bismark/shared';
 
@@ -32,6 +33,7 @@ export interface PublicPaymentProfile {
   concept: string | null;
   instructions: string | null;
   whatsapp: string | null;
+  methods?: PaymentMethodDTO[];
 }
 export interface PublicOrderLookupResult {
   orders: PublicOrderLookupItem[];

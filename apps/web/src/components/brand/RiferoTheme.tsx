@@ -25,7 +25,7 @@ export function RiferoTheme({
     <div
       style={
         {
-          '--rifero-primary': primaryColor ?? '#1d4ed8',
+          '--rifero-primary': primaryColor ?? '#1A4DFF',
           '--rifero-secondary': secondaryColor ?? '#0f172a',
         } as React.CSSProperties
       }

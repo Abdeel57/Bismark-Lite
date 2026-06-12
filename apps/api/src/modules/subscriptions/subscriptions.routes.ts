@@ -75,7 +75,7 @@ export default async function subscriptionsRoutes(app: FastifyInstance): Promise
       meta: { riferoId: data.riferoId, planId: data.planId, months: data.months },
     });
 
-    reply.code(201).send({
+    return reply.code(201).send({
       subscription: {
         id: result.id,
         riferoId: result.riferoId,

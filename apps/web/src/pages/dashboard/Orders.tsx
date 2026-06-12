@@ -123,7 +123,9 @@ function OrderCard({ order }: { order: OrderDTO }) {
     onError,
   });
 
-  const isPending = order.status === 'PENDING';
+  // Acciones de cobro: aplican a apartadas (RESERVED) y a las que ya subieron
+  // comprobante (PENDING). Antes sólo PENDING → no se podía confirmar un apartado.
+  const isPending = order.status === 'PENDING' || order.status === 'RESERVED';
   const remaining = timeRemaining(order.expiresAt);
   const waPhone = order.buyer.whatsapp ?? order.buyer.phone;
   const waMessage = waReserveMessage({

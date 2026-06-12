@@ -82,6 +82,18 @@ export const onboardingSchema = z.object({
 });
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
+// Método de pago del rifero (varios por perfil; se guardan como JSON).
+export const paymentMethodSchema = z.object({
+  id: z.string().min(1).max(40),
+  bank: z.string().min(1, 'Indica el banco o método').max(60),
+  holderName: z.string().max(120).optional().or(z.literal('')),
+  clabe: z.string().max(40).optional().or(z.literal('')),
+  cardNumber: z.string().max(40).optional().or(z.literal('')),
+  concept: z.string().max(120).optional().or(z.literal('')),
+  instructions: z.string().max(500).optional().or(z.literal('')),
+});
+export type PaymentMethodInput = z.infer<typeof paymentMethodSchema>;
+
 export const updateRiferoSchema = z.object({
   publicName: z.string().min(2).max(80).optional(),
   description: z.string().max(600).optional(),
@@ -103,6 +115,7 @@ export const updateRiferoSchema = z.object({
   payConcept: z.string().max(120).optional(),
   payInstructions: z.string().max(1000).optional(),
   payWhatsapp: z.string().max(20).optional(),
+  paymentMethods: z.array(paymentMethodSchema).max(6).optional(),
   defaultReserveMinutes: z.number().int().min(5).max(10080).optional(),
   allowProofUpload: z.boolean().optional(),
   showWinners: z.boolean().optional(),

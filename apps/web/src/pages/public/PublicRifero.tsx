@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { Ticket, Clock, ChevronDown, ArrowRight, PlayCircle } from 'lucide-react';
+import { Ticket, Clock, ChevronDown, ArrowRight, PlayCircle, Trophy } from 'lucide-react';
 import {
   RaffleStatus,
   eventLabel,
@@ -19,6 +19,7 @@ import { RiferoTheme } from '@/components/brand/RiferoTheme';
 import { VerifiedBadge } from '@/components/brand/VerifiedBadge';
 import { FacebookIcon, InstagramIcon, TiktokIcon, WhatsappIcon } from '@/components/brand/SocialIcons';
 import { PoweredBy } from '@/components/brand/PoweredBy';
+import { BismarkCta } from '@/components/brand/BismarkCta';
 import { LazyImage } from '@/components/public/LazyImage';
 import { SafeSeal } from '@/components/public/SafeSeal';
 
@@ -32,98 +33,90 @@ interface Props {
 const BRAND = 'var(--rifero-primary)';
 const BRAND_SOFT = 'color-mix(in srgb, var(--rifero-primary) 10%, transparent)';
 
-interface MiniRifero {
-  publicName: string;
-  logoUrl: string | null;
-  verified: boolean;
+// Días que faltan para el sorteo (null si no hay fecha o ya pasó).
+function daysToDraw(drawDate: string | null): number | null {
+  if (!drawDate) return null;
+  const ms = new Date(drawDate).getTime() - Date.now();
+  if (ms <= 0) return null;
+  return Math.ceil(ms / 86_400_000);
 }
 
-// ── Rifa como "publicación" del rifero (estilo feed) ────────────
-function RafflePost({
-  raffle,
-  basePath,
-  rifero,
-}: {
-  raffle: PublicRaffleSummaryDTO;
-  basePath: string;
-  rifero: MiniRifero;
-}) {
+// ── Tarjeta de rifa (pensada para móvil: insignias sobre la imagen,
+//    días al sorteo y precio tipo talón de boleto) ────────────────
+function RafflePost({ raffle, basePath }: { raffle: PublicRaffleSummaryDTO; basePath: string }) {
   const cover = raffle.coverUrl ? apiAssetUrl(raffle.coverUrl) : null;
-  const pct = raffle.totalTickets > 0 ? Math.min(100, Math.round((raffle.soldCount / raffle.totalTickets) * 100)) : 0;
   const finished = raffle.status === RaffleStatus.FINISHED;
   const href = `${basePath}/e${raffle.eventNumber}`;
+  const days = finished ? null : daysToDraw(raffle.drawDate);
 
   return (
     <article className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      {/* Cabecera tipo post */}
-      <div className="flex items-center gap-2.5 px-3.5 py-3">
-        {rifero.logoUrl ? (
-          <img src={apiAssetUrl(rifero.logoUrl)} alt="" className="h-9 w-9 rounded-full object-cover ring-1 ring-border" />
-        ) : (
-          <span className="grid h-9 w-9 place-items-center rounded-full bg-[var(--rifero-primary)] text-sm font-black text-white">
-            {rifero.publicName.charAt(0).toUpperCase()}
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-sm font-bold leading-tight">
-            <span className="truncate">{rifero.publicName}</span>
-            {rifero.verified && <VerifiedBadge size={13} />}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            {raffle.drawDate ? `Sorteo: ${formatDateMX(raffle.drawDate)}` : 'Rifa publicada'}
-          </p>
-        </div>
-        <Badge variant={finished ? 'muted' : 'success'}>{finished ? 'Finalizada' : 'Disponible'}</Badge>
-      </div>
-
-      {/* Portada de la rifa */}
-      <Link to={href} className="block active:opacity-95">
+      {/* Imagen con insignias superpuestas (sin cabecera redundante) */}
+      <Link to={href} className="relative block active:opacity-95">
         {cover ? (
           <div className="aspect-[16/9] w-full bg-muted">
             <LazyImage src={cover} alt={raffle.title} className="h-full w-full" width={640} height={360} />
           </div>
         ) : (
-          <div className="grid aspect-[16/9] w-full place-items-center bg-muted">
-            <Ticket className="h-10 w-10 text-muted-foreground/50" />
+          <div
+            className="grid aspect-[16/9] w-full place-items-center"
+            style={{ background: 'linear-gradient(135deg, var(--rifero-primary), var(--rifero-secondary))' }}
+          >
+            <Ticket className="h-10 w-10 text-white/60" />
           </div>
         )}
-      </Link>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/55 to-transparent" />
 
-      {/* Cuerpo */}
-      <div className="p-3.5">
         <span
-          className="inline-block rounded-md px-2 py-0.5 font-display text-[11px] font-extrabold text-white"
+          className="absolute left-3 top-3 rounded-md px-2 py-0.5 font-display text-[11px] font-extrabold text-white shadow"
           style={{ background: BRAND }}
         >
           {eventLabel(raffle.eventNumber)}
         </span>
-        <h3 className="mt-1.5 font-display text-lg font-extrabold uppercase leading-tight tracking-tight">
-          {raffle.title}
-        </h3>
-        {raffle.prize && <p className="line-clamp-1 text-sm text-muted-foreground">{raffle.prize}</p>}
+        <span
+          className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide shadow ${
+            finished ? 'bg-white/90 text-foreground' : 'bg-emerald-500 text-white'
+          }`}
+        >
+          {finished ? 'Finalizada' : 'Disponible'}
+        </span>
 
-        <div className="mt-3 flex items-end justify-between gap-3">
-          <div>
+        <div className="absolute bottom-2.5 left-3 flex items-center gap-2 text-white">
+          {days !== null && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold backdrop-blur">
+              <Clock className="h-3.5 w-3.5" />
+              {days === 1 ? 'Sortea mañana' : `Faltan ${days} días`}
+            </span>
+          )}
+          {raffle.drawDate && (
+            <span className="text-[11px] font-semibold text-white/85 [text-shadow:0_1px_2px_rgba(0,0,0,0.6)]">
+              {formatDateMX(raffle.drawDate)}
+            </span>
+          )}
+        </div>
+      </Link>
+
+      {/* Cuerpo compacto: título + premio a la izquierda, precio a la derecha */}
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-extrabold uppercase leading-tight tracking-tight">
+              {raffle.title}
+            </h3>
+            {raffle.prize && <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{raffle.prize}</p>}
+          </div>
+          <div className="shrink-0 text-right">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Por boleto</p>
-            <p className="font-ticket text-xl font-bold" style={{ color: BRAND }}>
+            <p className="font-ticket text-2xl font-bold leading-tight" style={{ color: BRAND }}>
               {formatMXN(raffle.ticketPrice)}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vendidos</p>
-            <p className="font-ticket text-sm font-bold tabular-nums">
-              {raffle.soldCount}/{raffle.totalTickets}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: BRAND }} />
         </div>
 
         <Button
           asChild
-          className={`mt-3.5 w-full font-display font-extrabold uppercase tracking-wide text-white ${
+          size="lg"
+          className={`mt-3.5 w-full rounded-xl font-display font-extrabold uppercase tracking-wide text-white ${
             finished ? '' : 'attn-pulse'
           }`}
           style={{ background: BRAND }}
@@ -137,24 +130,40 @@ function RafflePost({
   );
 }
 
-// ── Tarjeta de ganador ──────────────────────────────────────────
+// ── Tarjeta de ganador (oro para el 1er lugar) ──────────────────
 function WinnerCard({ w }: { w: PublicRiferoWinner }) {
+  const first = w.position === 1;
   return (
     <div className="flex items-center gap-3 rounded-2xl border bg-card p-3.5 shadow-sm">
       <div
-        className="grid h-12 w-12 shrink-0 place-items-center rounded-xl font-display text-lg font-extrabold"
-        style={{ background: BRAND_SOFT, color: BRAND }}
+        className="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+        style={
+          first
+            ? { background: '#fff3d6', color: '#8a5b00' }
+            : { background: BRAND_SOFT, color: BRAND }
+        }
       >
-        {w.position}°
+        {first ? (
+          <Trophy className="h-5 w-5" />
+        ) : (
+          <span className="font-display text-lg font-extrabold">{w.position}°</span>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          {first ? '1er lugar · ' : `${w.position}° lugar · `}
           {w.eventLabel} · {w.raffleTitle}
         </p>
-        <p className="font-ticket text-xl font-bold leading-tight" style={{ color: BRAND }}>
+        <p
+          className="mt-0.5 inline-block rounded-md border border-dashed px-2 py-0.5 font-ticket text-xl font-bold leading-tight"
+          style={{
+            color: first ? '#8a5b00' : BRAND,
+            borderColor: first ? '#e9c478' : 'color-mix(in srgb, var(--rifero-primary) 35%, transparent)',
+          }}
+        >
           {w.ticketDisplayNumber}
         </p>
-        {w.prizeDescription && <p className="line-clamp-1 text-sm text-muted-foreground">{w.prizeDescription}</p>}
+        {w.prizeDescription && <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{w.prizeDescription}</p>}
       </div>
       {w.evidenceUrl && (
         <a
@@ -171,27 +180,43 @@ function WinnerCard({ w }: { w: PublicRiferoWinner }) {
   );
 }
 
-// ── Pregunta frecuente (acordeón nativo) ────────────────────────
-function Faq({ q, children }: { q: string; children: React.ReactNode }) {
+// ── Pregunta frecuente (acordeón nativo, numerado) ──────────────
+function Faq({ n, q, children }: { n: number; q: string; children: React.ReactNode }) {
   return (
-    <details className="group rounded-2xl border bg-card px-4 py-3.5 shadow-sm [&_summary::-webkit-details-marker]:hidden">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-display text-sm font-extrabold uppercase tracking-tight">
-        {q}
+    <details className="group rounded-2xl border bg-card px-4 py-3.5 shadow-sm transition-colors open:border-[var(--rifero-primary)]/40 [&_summary::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-3 font-display text-sm font-extrabold uppercase tracking-tight">
+        <span className="font-ticket text-xs font-bold text-muted-foreground/50 transition-colors group-open:text-[var(--rifero-primary)]">
+          {String(n).padStart(2, '0')}
+        </span>
+        <span className="flex-1">{q}</span>
         <ChevronDown
           className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180"
           style={{ color: BRAND }}
         />
       </summary>
-      <div className="mt-2.5 text-sm leading-relaxed text-muted-foreground">{children}</div>
+      <div className="mt-2.5 pl-8 text-sm leading-relaxed text-muted-foreground">{children}</div>
     </details>
   );
 }
 
+// Título de sección compacto: líneas decorativas a los lados (ahorra alto y
+// se siente más editorial que el título con barra debajo). Mixto (no MAYÚSCULAS)
+// en Bricolage Grotesque, con un punto en el color del rifero como acento fresco.
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-4 text-center">
-      <h2 className="font-display text-xl font-extrabold uppercase tracking-tight">{children}</h2>
-      <span className="mx-auto mt-2 block h-1 w-12 rounded-full" style={{ background: BRAND }} />
+    <div className="mb-4 flex items-center gap-3.5">
+      <span
+        className="h-px flex-1"
+        style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb, var(--rifero-primary) 45%, transparent))' }}
+      />
+      <h2 className="shrink-0 font-display text-xl font-extrabold tracking-[-0.02em] sm:text-2xl">
+        {children}
+        <span className="text-[var(--rifero-primary)]">.</span>
+      </h2>
+      <span
+        className="h-px flex-1"
+        style={{ background: 'linear-gradient(90deg, color-mix(in srgb, var(--rifero-primary) 45%, transparent), transparent)' }}
+      />
     </div>
   );
 }
@@ -246,139 +271,205 @@ export default function PublicRifero({ subdomain, previewData }: Props) {
   const logo = rifero.logoUrl ? apiAssetUrl(rifero.logoUrl) : null;
   // Foto de perfil (estilo FB), ajustable desde Apariencia, con tope para no romper el layout.
   const photoPx = Math.min(Math.round((120 * (rifero.logoScale ?? 100)) / 100), 168);
-  const mini: MiniRifero = { publicName: rifero.publicName, logoUrl: rifero.logoUrl, verified: rifero.verified };
 
   const active = rifero.raffles.filter((r) => r.status === RaffleStatus.PUBLISHED);
   const finished = rifero.raffles.filter((r) => r.status === RaffleStatus.FINISHED);
 
   return (
     <RiferoTheme primaryColor={rifero.primaryColor} secondaryColor={rifero.secondaryColor}>
-      <div className="min-h-screen bg-muted/40 pb-16">
+      <div className="min-h-screen bg-muted/40">
         {/* ── Portada (banner) ── */}
-        <div className="relative h-44 w-full overflow-hidden sm:h-60">
+        <div className="relative h-44 w-full overflow-hidden sm:h-56 lg:h-64">
           {cover ? (
             <LazyImage src={cover} alt="" className="h-full w-full" loading="eager" />
           ) : (
             <div
-              className="h-full w-full"
+              className="relative h-full w-full"
               style={{ background: 'linear-gradient(135deg, var(--rifero-primary), var(--rifero-secondary))' }}
-            />
+            >
+              {/* Textura para que la portada sin imagen no se vea vacía */}
+              <div className="grain absolute inset-0 opacity-25" />
+              <div
+                className="absolute inset-0 opacity-[0.12]"
+                style={{
+                  backgroundImage: 'radial-gradient(circle, #fff 1.2px, transparent 1.2px)',
+                  backgroundSize: '26px 26px',
+                }}
+              />
+              <div className="absolute -top-24 left-1/2 h-80 w-[44rem] -translate-x-1/2 rounded-full bg-white/15 blur-[110px]" />
+            </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-1.5" style={{ background: BRAND }} />
         </div>
 
-        <div className="mx-auto max-w-2xl px-4">
-          {/* ── Foto de perfil centrada (sobre la portada) ── */}
-          <div className="flex justify-center" style={{ marginTop: -photoPx / 2 }}>
-            <div className="relative shrink-0">
+        <div className="mx-auto max-w-2xl px-4 pb-14 lg:max-w-5xl">
+          {/* ── Encabezado de perfil: centrado en móvil, tarjeta horizontal en desktop ── */}
+          {/* relative z-10: la tarjeta sube sobre la portada y debe pintar encima de sus overlays absolutos */}
+          <div className="relative z-10 lg:-mt-12 lg:rounded-3xl lg:border lg:bg-card lg:px-8 lg:pb-6 lg:shadow-xl">
+            <div className="flex flex-col items-center lg:flex-row lg:items-end lg:gap-6">
+              {/* Foto de perfil (sobre la portada / sobre la tarjeta) */}
               <div
-                className="overflow-hidden rounded-full border-4 border-background bg-card shadow-xl"
-                style={{
-                  height: photoPx,
-                  width: photoPx,
-                  boxShadow: rifero.logoGlow
-                    ? '0 0 0 4px hsl(var(--background)), 0 0 14px color-mix(in srgb, var(--rifero-primary) 35%, transparent), 0 12px 28px rgba(0,0,0,0.2)'
-                    : undefined,
-                }}
+                className="flex shrink-0 justify-center"
+                style={{ ['--av-mt' as string]: `${-photoPx / 2}px` }}
               >
-                {logo ? (
-                  <img src={logo} alt={rifero.publicName} className="h-full w-full object-contain" />
-                ) : (
+                <div className="relative mt-[var(--av-mt)] lg:mt-[var(--av-mt)]">
                   <div
-                    className="grid h-full w-full place-items-center font-black text-white"
-                    style={{ background: BRAND, fontSize: Math.round(photoPx * 0.38) }}
+                    className="overflow-hidden rounded-full border-4 border-background bg-card shadow-xl"
+                    style={{
+                      height: photoPx,
+                      width: photoPx,
+                      boxShadow: rifero.logoGlow
+                        ? '0 0 0 4px hsl(var(--background)), 0 0 14px color-mix(in srgb, var(--rifero-primary) 35%, transparent), 0 12px 28px rgba(0,0,0,0.2)'
+                        : undefined,
+                    }}
                   >
-                    {rifero.publicName.charAt(0).toUpperCase()}
+                    {logo ? (
+                      <img src={logo} alt={rifero.publicName} className="h-full w-full object-contain" />
+                    ) : (
+                      <div
+                        className="grid h-full w-full place-items-center font-black text-white"
+                        style={{ background: BRAND, fontSize: Math.round(photoPx * 0.38) }}
+                      >
+                        {rifero.publicName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
+                  {rifero.verified && (
+                    <VerifiedBadge size={30} className="absolute bottom-0.5 right-0.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]" />
+                  )}
+                </div>
+              </div>
+
+              {/* Nombre + bio + redes */}
+              <div className="mt-3 min-w-0 flex-1 text-center lg:mt-0 lg:pb-1 lg:text-left">
+                <h1 className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold tracking-tight sm:text-3xl lg:justify-start">
+                  {rifero.publicName}
+                  {rifero.verified && <VerifiedBadge size={22} />}
+                </h1>
+                {rifero.description && (
+                  <p className="mx-auto mt-2 max-w-md whitespace-pre-line text-sm leading-relaxed text-muted-foreground lg:mx-0">
+                    {rifero.description}
+                  </p>
+                )}
+
+                {/* Insignias del rifero (stats compactas; oculta las que van en 0) */}
+                {(() => {
+                  const chips = [
+                    { value: active.length, label: active.length === 1 ? 'disponible' : 'disponibles' },
+                    { value: finished.length, label: finished.length === 1 ? 'sorteo realizado' : 'sorteos realizados' },
+                    { value: winners.length, label: winners.length === 1 ? 'ganador' : 'ganadores' },
+                  ].filter((c) => c.value > 0);
+                  if (chips.length === 0) return null;
+                  return (
+                    <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5 lg:justify-start">
+                      {chips.map((c) => (
+                        <span
+                          key={c.label}
+                          className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-[11px] font-semibold text-muted-foreground shadow-sm"
+                        >
+                          <strong className="font-ticket text-xs font-bold" style={{ color: BRAND }}>
+                            {c.value}
+                          </strong>
+                          {c.label}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Redes (logos oficiales) */}
+                <div className="mt-3.5 flex flex-wrap items-center justify-center gap-2.5 lg:justify-start">
+                  {rifero.facebook && (
+                    <a
+                      href={rifero.facebook}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Facebook"
+                      className="grid h-11 w-11 place-items-center rounded-full border bg-card text-[#1877F2] shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <FacebookIcon className="h-[22px] w-[22px]" />
+                    </a>
+                  )}
+                  {rifero.instagram && (
+                    <a
+                      href={rifero.instagram}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Instagram"
+                      className="grid h-11 w-11 place-items-center rounded-full border bg-card shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <InstagramIcon className="h-[22px] w-[22px]" />
+                    </a>
+                  )}
+                  {rifero.tiktok && (
+                    <a
+                      href={rifero.tiktok}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="TikTok"
+                      className="grid h-11 w-11 place-items-center rounded-full border bg-card text-foreground shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <TiktokIcon className="h-[21px] w-[21px]" />
+                    </a>
+                  )}
+                  {rifero.whatsapp && (
+                    <a
+                      href={buildWhatsappLink(
+                        rifero.whatsapp,
+                        `Hola ${rifero.publicName}, vi tu página de rifas y tengo una pregunta.`,
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-11 items-center gap-2 rounded-full bg-[#25D366] px-4 font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5 lg:hidden"
+                    >
+                      <WhatsappIcon className="h-5 w-5" />
+                      WhatsApp
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Acciones (solo desktop): CTA primario + WhatsApp */}
+              <div className="hidden shrink-0 flex-col items-stretch gap-2.5 lg:flex lg:pb-1">
+                {active.length > 0 && (
+                  <Button
+                    asChild
+                    size="lg"
+                    className="rounded-full font-display font-extrabold uppercase tracking-wide text-white"
+                    style={{ background: BRAND }}
+                  >
+                    <a href="#rifas">
+                      Ver rifas disponibles <ChevronDown className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+                {rifero.whatsapp && (
+                  <a
+                    href={buildWhatsappLink(
+                      rifero.whatsapp,
+                      `Hola ${rifero.publicName}, vi tu página de rifas y tengo una pregunta.`,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5"
+                  >
+                    <WhatsappIcon className="h-5 w-5" />
+                    WhatsApp
+                  </a>
                 )}
               </div>
-              {rifero.verified && (
-                <span className="absolute bottom-1 right-1 grid place-items-center rounded-full bg-background p-0.5 shadow-md">
-                  <VerifiedBadge size={26} />
-                </span>
-              )}
             </div>
-          </div>
 
-          {/* ── Nombre + bio ── */}
-          <div className="mt-3 text-center">
-            <h1 className="flex items-center justify-center gap-1.5 font-display text-2xl font-extrabold tracking-tight sm:text-3xl">
-              {rifero.publicName}
-              {rifero.verified && <VerifiedBadge size={22} />}
-            </h1>
-            {rifero.description && (
-              <p className="mx-auto mt-2 max-w-md whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {rifero.description}
-              </p>
-            )}
-          </div>
-
-          {/* ── Estadísticas ── */}
-          <div className="mt-4 grid grid-cols-3 divide-x rounded-2xl border bg-card py-3 text-center shadow-sm">
-            <Stat value={active.length} label="Disponibles" />
-            <Stat value={finished.length} label="Finalizadas" />
-            <Stat value={winners.length} label="Ganadores" />
-          </div>
-
-          {/* ── Redes y contacto (logos oficiales) ── */}
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
-            {rifero.facebook && (
-              <a
-                href={rifero.facebook}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Facebook"
-                className="grid h-11 w-11 place-items-center rounded-full border bg-card text-[#1877F2] shadow-sm transition-transform hover:-translate-y-0.5"
-              >
-                <FacebookIcon className="h-[22px] w-[22px]" />
-              </a>
-            )}
-            {rifero.instagram && (
-              <a
-                href={rifero.instagram}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Instagram"
-                className="grid h-11 w-11 place-items-center rounded-full border bg-card shadow-sm transition-transform hover:-translate-y-0.5"
-              >
-                <InstagramIcon className="h-[22px] w-[22px]" />
-              </a>
-            )}
-            {rifero.tiktok && (
-              <a
-                href={rifero.tiktok}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="TikTok"
-                className="grid h-11 w-11 place-items-center rounded-full border bg-card text-foreground shadow-sm transition-transform hover:-translate-y-0.5"
-              >
-                <TiktokIcon className="h-[21px] w-[21px]" />
-              </a>
-            )}
-            {rifero.whatsapp && (
-              <a
-                href={buildWhatsappLink(
-                  rifero.whatsapp,
-                  `Hola ${rifero.publicName}, vi tu página de rifas y tengo una pregunta.`,
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-[#25D366] px-4 font-bold text-white shadow-sm transition-transform hover:-translate-y-0.5"
-              >
-                <WhatsappIcon className="h-5 w-5" />
-                WhatsApp
-              </a>
-            )}
           </div>
 
           {/* ── Rifas disponibles (feed) ── */}
-          <section className="mt-8">
+          <section id="rifas" className="mt-5 scroll-mt-6 lg:mt-10">
             <SectionTitle>Rifas disponibles</SectionTitle>
             {active.length > 0 ? (
-              <div className="grid gap-4">
+              <div className={active.length > 1 ? 'grid gap-4 lg:grid-cols-2 lg:gap-5' : 'mx-auto grid max-w-xl gap-4'}>
                 {active.map((r) => (
-                  <RafflePost key={r.id} raffle={r} basePath={basePath} rifero={mini} />
+                  <RafflePost key={r.id} raffle={r} basePath={basePath} />
                 ))}
               </div>
             ) : (
@@ -392,9 +483,9 @@ export default function PublicRifero({ subdomain, previewData }: Props) {
 
           {/* ── Ganadores ── */}
           {winners.length > 0 && (
-            <section className="mt-10">
+            <section className="mt-10 lg:mt-14">
               <SectionTitle>Ganadores</SectionTitle>
-              <div className="grid gap-3">
+              <div className={winners.length > 1 ? 'grid gap-3 lg:grid-cols-2' : 'mx-auto grid max-w-xl gap-3'}>
                 {winners.map((w) => (
                   <WinnerCard key={w.id} w={w} />
                 ))}
@@ -403,56 +494,60 @@ export default function PublicRifero({ subdomain, previewData }: Props) {
           )}
 
           {/* ── Preguntas frecuentes ── */}
-          <section className="mt-10">
+          <section className="mx-auto mt-10 max-w-3xl lg:mt-14">
             <SectionTitle>Preguntas frecuentes</SectionTitle>
             <div className="grid gap-2.5">
-              <Faq q="¿Cómo participo?">
+              <Faq n={1} q="¿Cómo participo?">
                 Entra a la rifa, elige tus números disponibles, apártalos con tu nombre y teléfono, y realiza tu pago.
               </Faq>
-              <Faq q="¿Cómo pago mis boletos?">
+              <Faq n={2} q="¿Cómo pago mis boletos?">
                 Haz tu transferencia o depósito a los datos del rifero (los ves en “Métodos de pago”) y sube tu
                 comprobante. El organizador confirma tu pago.
               </Faq>
-              <Faq q="¿Dónde veo mis boletos?">
+              <Faq n={3} q="¿Dónde veo mis boletos?">
                 En{' '}
                 <Link to={verificarHref} className="font-semibold underline" style={{ color: BRAND }}>
                   Verificar mis boletos
                 </Link>{' '}
                 buscas con tu teléfono tus boletos apartados o pagados, subes tu comprobante y abres tu boleto digital.
               </Faq>
-              <Faq q="¿Cuándo se realiza el sorteo?">
+              <Faq n={4} q="¿Cuándo se realiza el sorteo?">
                 En la fecha indicada en cada rifa. Tu boleto pagado es tu boleto participante.
               </Faq>
-              <Faq q="¿Es confiable?">
+              <Faq n={5} q="¿Es confiable?">
                 {rifero.verified ? 'Este rifero está verificado. ' : ''}
                 Cada boleto pagado genera un boleto digital con código QR para validarlo el día del sorteo.
               </Faq>
             </div>
           </section>
 
-          {/* ── Pie ── */}
-          <footer className="mt-14 flex flex-col items-center gap-3 border-t pt-6">
-            {rifero.verified && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                <VerifiedBadge size={15} /> Rifero verificado
-              </span>
-            )}
-            <PoweredBy />
+          {/* ── Cierre de confianza ── */}
+          <footer className="mx-auto mt-14 max-w-3xl">
+            <div className="flex flex-col items-center gap-3 rounded-2xl border bg-card px-6 py-6 text-center shadow-sm">
+              {rifero.verified && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                  style={{ background: BRAND_SOFT, color: BRAND }}
+                >
+                  <VerifiedBadge size={15} /> Rifero verificado
+                </span>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Cada boleto pagado genera un boleto digital con QR.{' '}
+                <Link to={verificarHref} className="font-semibold underline" style={{ color: BRAND }}>
+                  Verifica los tuyos aquí
+                </Link>
+                .
+              </p>
+            </div>
           </footer>
         </div>
+
+        {/* ── Cierre de marca: banda a todo el ancho que desconecta de la rifa ── */}
+        <BismarkCta />
       </div>
       <SafeSeal />
     </RiferoTheme>
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="px-2">
-      <p className="font-ticket text-xl font-bold" style={{ color: BRAND }}>
-        {value}
-      </p>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
-    </div>
-  );
-}

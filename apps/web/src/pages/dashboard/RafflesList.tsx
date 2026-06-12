@@ -9,7 +9,9 @@ import {
   type RaffleStatus,
 } from '@bismark/shared';
 import { raffleService } from '@/services/raffles';
+import { riferoService } from '@/services/riferos';
 import { ApiError } from '@/lib/api';
+import { buildRaffleUrl } from '@/lib/site';
 import { Button } from '@/components/ui/button';
 import { Badge, type BadgeProps } from '@/components/ui/badge';
 import { PageLoader, EmptyState } from '@/components/ui/misc';
@@ -28,9 +30,25 @@ function RaffleStatusBadge({ status }: { status: RaffleStatus }) {
   return <Badge variant={STATUS_VARIANT[status]}>{RAFFLE_STATUS_LABELS[status]}</Badge>;
 }
 
-function RaffleCard({ raffle }: { raffle: RaffleDTO }) {
+function RaffleCard({ raffle, slug }: { raffle: RaffleDTO; slug?: string }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Compartir el link público de la rifa (nativo en móvil, copiar en desktop).
+  const share = () => {
+    if (!slug) return;
+    const url = buildRaffleUrl(slug, raffle.eventNumber);
+    if (navigator.share) {
+      void navigator
+        .share({ title: raffle.title, text: `Participa en mi rifa "${raffle.title}": ${url}`, url })
+        .catch(() => {});
+      return;
+    }
+    navigator.clipboard
+      .writeText(url)
+      .then(() => toast.success('Link de la rifa copiado. ¡Compártelo!'))
+      .catch(() => toast.error('No se pudo copiar el link'));
+  };
 
   const publish = useMutation({
     mutationFn: () => raffleService.publish(raffle.id),
@@ -104,9 +122,22 @@ function RaffleCard({ raffle }: { raffle: RaffleDTO }) {
         </Button>
       </div>
 
+      {/* Acción primaria según el estado de la rifa */}
       {raffle.status === 'DRAFT' && (
         <Button variant="brand" className="mt-2 w-full" loading={publish.isPending} onClick={() => publish.mutate()}>
           Publicar rifa
+        </Button>
+      )}
+      {raffle.status === 'PUBLISHED' && slug && (
+        <Button variant="brand" className="mt-2 w-full" onClick={share}>
+          Compartir rifa
+        </Button>
+      )}
+      {raffle.status === 'FINISHED' && slug && (
+        <Button asChild variant="outline" className="mt-2 w-full">
+          <a href={buildRaffleUrl(slug, raffle.eventNumber)} target="_blank" rel="noopener noreferrer">
+            Ver resultado público
+          </a>
         </Button>
       )}
     </div>
@@ -120,6 +151,8 @@ export default function RafflesList() {
     queryKey: ['raffles'],
     queryFn: () => raffleService.list(),
   });
+  const profileQ = useQuery({ queryKey: ['rifero', 'me'], queryFn: () => riferoService.me() });
+  const slug = profileQ.data?.profile.slug;
 
   const raffles = data?.items ?? [];
 
@@ -156,7 +189,7 @@ export default function RafflesList() {
       ) : (
         <div className="grid gap-3">
           {raffles.map((raffle) => (
-            <RaffleCard key={raffle.id} raffle={raffle} />
+            <RaffleCard key={raffle.id} raffle={raffle} slug={slug} />
           ))}
         </div>
       )}

@@ -13,6 +13,7 @@ import {
   type WinnerDTO,
   type RaffleImageDTO,
   type PaymentProofDTO,
+  type PaymentMethodDTO,
 } from '@bismark/shared';
 import type {
   User,
@@ -74,6 +75,31 @@ export interface PlanCtxLite {
   subscriptionStatus: Subscription['status'] | null;
 }
 
+// Métodos de pago del rifero: lista JSON; si está vacía, sintetiza uno con los
+// campos pay* legados para que los perfiles existentes sigan mostrando su tarjeta.
+export function riferoPaymentMethods(p: RiferoProfile): PaymentMethodDTO[] {
+  const raw = p.paymentMethods;
+  if (Array.isArray(raw) && raw.length > 0) {
+    return (raw as unknown[]).filter(
+      (m): m is PaymentMethodDTO => !!m && typeof m === 'object' && typeof (m as PaymentMethodDTO).bank === 'string',
+    );
+  }
+  if (p.payBank || p.payClabe || p.payCardNumber || p.payHolderName) {
+    return [
+      {
+        id: 'legacy',
+        bank: p.payBank ?? 'Transferencia',
+        holderName: p.payHolderName ?? null,
+        clabe: p.payClabe ?? null,
+        cardNumber: p.payCardNumber ?? null,
+        concept: p.payConcept ?? null,
+        instructions: null,
+      },
+    ];
+  }
+  return [];
+}
+
 export function toRiferoProfileDTO(p: RiferoProfile, ctx: PlanCtxLite): RiferoProfileDTO {
   return {
     id: p.id,
@@ -101,6 +127,7 @@ export function toRiferoProfileDTO(p: RiferoProfile, ctx: PlanCtxLite): RiferoPr
     payConcept: p.payConcept ?? null,
     payInstructions: p.payInstructions ?? null,
     payWhatsapp: p.payWhatsapp ?? null,
+    paymentMethods: riferoPaymentMethods(p),
     defaultReserveMinutes: p.defaultReserveMinutes,
     allowProofUpload: p.allowProofUpload,
     showWinners: p.showWinners,

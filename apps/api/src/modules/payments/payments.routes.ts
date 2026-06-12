@@ -79,7 +79,7 @@ export default async function paymentsRoutes(app: FastifyInstance): Promise<void
         url: `${env.publicWebUrl}/panel/admin/ordenes`,
       });
 
-      reply.code(201).send({ proof: toPaymentProofDTO(proof) });
+      return reply.code(201).send({ proof: toPaymentProofDTO(proof) });
     },
   );
 

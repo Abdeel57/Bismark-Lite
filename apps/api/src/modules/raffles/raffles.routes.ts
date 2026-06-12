@@ -134,7 +134,7 @@ export default async function rafflesRoutes(app: FastifyInstance): Promise<void>
       meta: { raffleId: raffle.id, eventNumber },
     });
 
-    reply.code(201).send({ raffle: await raffleDTO(raffle.id) });
+    return reply.code(201).send({ raffle: await raffleDTO(raffle.id) });
   });
 
   // GET /raffles/:id

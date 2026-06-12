@@ -5,6 +5,7 @@ import { requireRifero } from '../../middlewares/auth.js';
 import { loadOwnedOrder } from '../../lib/ownership.js';
 import { renderDigitalTicketPdf } from '../../lib/pdf.js';
 import { getPlanContext } from '../../lib/plan.js';
+import { riferoPaymentMethods } from '../../lib/serializers.js';
 import { env } from '../../config/env.js';
 import { ORDER_STATUS_LABELS } from '@bismark/shared';
 
@@ -82,6 +83,7 @@ export default async function digitalTicketsRoutes(app: FastifyInstance): Promis
           concept: profile.payConcept,
           instructions: profile.payInstructions ?? o.raffle.paymentInstructions,
           whatsapp: profile.payWhatsapp ?? profile.whatsapp,
+          methods: riferoPaymentMethods(profile),
         },
       },
     };
@@ -108,7 +110,7 @@ export default async function digitalTicketsRoutes(app: FastifyInstance): Promis
       primaryColor: o.raffle.rifero.primaryColor,
     });
 
-    reply
+    return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `attachment; filename="boleto-${o.code}.pdf"`)
       .send(pdf);

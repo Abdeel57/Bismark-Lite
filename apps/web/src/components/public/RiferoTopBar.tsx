@@ -26,7 +26,7 @@ export function RiferoTopBar({
   const glow = { textShadow: '0 0 5px var(--rifero-primary), 0 0 11px var(--rifero-primary)' };
 
   return (
-    <div className="sticky top-0 z-50 border-y-[8px] border-[var(--rifero-primary,#2751fb)] bg-zinc-950/95 text-white backdrop-blur safe-top">
+    <div className="sticky top-0 z-50 border-y-[8px] border-[var(--rifero-primary,#1A4DFF)] bg-zinc-950/95 text-white backdrop-blur safe-top">
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-3" style={{ height: 56 }}>
         <a href={leftHref} className={linkClass} style={glow}>
           Métodos
@@ -47,14 +47,12 @@ export function RiferoTopBar({
               }}
             />
           ) : (
-            <div className="grid h-full w-full place-items-center rounded-full border-2 border-white bg-[var(--rifero-primary,#2751fb)] text-xl font-black text-white">
+            <div className="grid h-full w-full place-items-center rounded-full border-2 border-white bg-[var(--rifero-primary,#1A4DFF)] text-xl font-black text-white">
               {publicName.charAt(0).toUpperCase()}
             </div>
           )}
           {verified && (
-            <span className="absolute -right-1 -top-1 grid place-items-center rounded-full bg-white p-0.5 shadow">
-              <VerifiedBadge size={15} />
-            </span>
+            <VerifiedBadge size={17} className="absolute -right-1 -top-1 drop-shadow-[0_1px_4px_rgba(0,0,0,0.45)]" />
           )}
         </div>
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -46,6 +46,7 @@ import {
 import { RiferoTheme } from '@/components/brand/RiferoTheme';
 import { WhatsAppButton } from '@/components/brand/WhatsAppButton';
 import { PoweredBy } from '@/components/brand/PoweredBy';
+import { BismarkCta } from '@/components/brand/BismarkCta';
 import { TicketGrid } from '@/components/TicketGrid';
 import { GoToNumber } from '@/components/public/GoToNumber';
 import { RaffleBrandBar, BAR_TOTAL } from '@/components/public/RaffleBrandBar';
@@ -223,10 +224,13 @@ export default function PublicRaffle({ subdomain }: Props) {
   const onSubmitBuyer = (values: ReserveFormInput) => {
     // El WhatsApp es el contacto (también el teléfono); el nombre se arma con nombres + apellidos.
     const buyer: BuyerInput = {
-      fullName: [values.nombres, values.apellidos].map((s) => (s ?? '').trim()).filter(Boolean).join(' '),
+      fullName: [values.nombres, values.apellidos]
+        .map((s) => (s ?? '').trim().toUpperCase())
+        .filter(Boolean)
+        .join(' '),
       phone: values.whatsapp,
       whatsapp: values.whatsapp,
-      state: values.state || '',
+      state: (values.state || '').toUpperCase(),
     };
     // Recuerda los datos para que la próxima vez no tenga que teclearlos de nuevo.
     rememberBuyer(buyer);
@@ -254,9 +258,19 @@ export default function PublicRaffle({ subdomain }: Props) {
     }
   };
 
+  // Nombre y apellidos del comprador: se muestran y guardan en MAYÚSCULAS.
+  const nombresField = form.register('nombres');
+  const apellidosField = form.register('apellidos');
+  const toUpperLive =
+    (field: { onChange: (e: ChangeEvent<HTMLInputElement>) => void }) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      e.target.value = e.target.value.toUpperCase();
+      field.onChange(e);
+    };
+
   return (
     <RiferoTheme primaryColor={rifero.primaryColor} secondaryColor={rifero.secondaryColor}>
-      <div className="min-h-screen bg-background pb-10">
+      <div className="min-h-screen bg-background">
         {/* ── Cintillo fijo de la rifa (métodos de pago · logo → perfil · sube tu pago → verificar) ── */}
         <RaffleBrandBar
           logoUrl={rifero.logoUrl}
@@ -490,10 +504,9 @@ export default function PublicRaffle({ subdomain }: Props) {
           </a>
         )}
 
-        {/* Pie discreto */}
-        <footer className="mt-8 flex justify-center pb-2">
-          <PoweredBy />
-        </footer>
+        {/* Cierre de marca: banda a todo el ancho. Pegada a la barra de WhatsApp (sin
+            hueco); si el rifero no tiene WhatsApp, conserva separación con mt-10. */}
+        <BismarkCta className={rifero.whatsapp ? undefined : 'mt-10'} />
       </div>
 
       {/* ── Diálogo: métodos de pago del rifero ── */}
@@ -571,8 +584,9 @@ export default function PublicRaffle({ subdomain }: Props) {
                 <Input
                   autoComplete="given-name"
                   placeholder="Nombre(s)"
-                  className="h-12 rounded-xl border-transparent bg-muted text-base placeholder:font-semibold placeholder:uppercase placeholder:tracking-wide focus-visible:border-[var(--rifero-primary)] focus-visible:bg-background focus-visible:ring-[var(--rifero-primary)]"
-                  {...form.register('nombres')}
+                  className="h-12 rounded-xl border-transparent bg-muted text-base uppercase placeholder:font-semibold placeholder:uppercase placeholder:tracking-wide focus-visible:border-[var(--rifero-primary)] focus-visible:bg-background focus-visible:ring-[var(--rifero-primary)]"
+                  {...nombresField}
+                  onChange={toUpperLive(nombresField)}
                 />
                 {form.formState.errors.nombres && (
                   <p className="mt-1 text-sm text-destructive">{form.formState.errors.nombres.message}</p>
@@ -583,8 +597,9 @@ export default function PublicRaffle({ subdomain }: Props) {
                 <Input
                   autoComplete="family-name"
                   placeholder="Apellidos (opcional)"
-                  className="h-12 rounded-xl border-transparent bg-muted text-base placeholder:font-semibold placeholder:uppercase placeholder:tracking-wide focus-visible:border-[var(--rifero-primary)] focus-visible:bg-background focus-visible:ring-[var(--rifero-primary)]"
-                  {...form.register('apellidos')}
+                  className="h-12 rounded-xl border-transparent bg-muted text-base uppercase placeholder:font-semibold placeholder:uppercase placeholder:tracking-wide focus-visible:border-[var(--rifero-primary)] focus-visible:bg-background focus-visible:ring-[var(--rifero-primary)]"
+                  {...apellidosField}
+                  onChange={toUpperLive(apellidosField)}
                 />
                 {form.formState.errors.apellidos && (
                   <p className="mt-1 text-sm text-destructive">{form.formState.errors.apellidos.message}</p>
@@ -664,29 +679,10 @@ export default function PublicRaffle({ subdomain }: Props) {
                   </div>
                 </div>
 
-                {/* Instrucciones de pago */}
-                <div className="rounded-xl border p-3">
+                {/* Datos para tu pago: tarjetas bancarias del rifero */}
+                <div>
                   <p className="mb-2 text-sm font-bold">Datos para tu pago</p>
-                  <dl className="space-y-2 text-sm">
-                    {receipt.paymentProfile.holderName && (
-                      <PayRow label="Titular" value={receipt.paymentProfile.holderName} />
-                    )}
-                    {receipt.paymentProfile.bank && <PayRow label="Banco" value={receipt.paymentProfile.bank} />}
-                    {receipt.paymentProfile.clabe && (
-                      <PayRow label="CLABE" value={receipt.paymentProfile.clabe} onCopy={copyText} mono />
-                    )}
-                    {receipt.paymentProfile.cardNumber && (
-                      <PayRow label="Tarjeta" value={receipt.paymentProfile.cardNumber} onCopy={copyText} mono />
-                    )}
-                    {receipt.paymentProfile.concept && (
-                      <PayRow label="Concepto" value={receipt.paymentProfile.concept} />
-                    )}
-                  </dl>
-                  {receipt.paymentProfile.instructions && (
-                    <p className="mt-3 whitespace-pre-line border-t pt-3 text-sm text-muted-foreground">
-                      {receipt.paymentProfile.instructions}
-                    </p>
-                  )}
+                  <PaymentCard pay={receipt.paymentProfile} />
                 </div>
 
                 {/* Acciones */}
@@ -781,34 +777,3 @@ export default function PublicRaffle({ subdomain }: Props) {
   );
 }
 
-// Fila de dato de pago con copiar opcional.
-function PayRow({
-  label,
-  value,
-  onCopy,
-  mono,
-}: {
-  label: string;
-  value: string;
-  onCopy?: (text: string, label: string) => void;
-  mono?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-2">
-        <span className={`truncate font-semibold ${mono ? 'tabular-nums' : ''}`}>{value}</span>
-        {onCopy && (
-          <button
-            type="button"
-            onClick={() => onCopy(value, label)}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-            aria-label={`Copiar ${label}`}
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </dd>
-    </div>
-  );
-}

@@ -21,13 +21,13 @@ export default async function pushRoutes(app: FastifyInstance): Promise<void> {
       { endpoint: body.endpoint, keys: { p256dh: body.keys.p256dh, auth: body.keys.auth } },
       request.headers['user-agent'],
     );
-    reply.code(201).send({ ok: true });
+    return reply.code(201).send({ ok: true });
   });
 
   // POST /push/unsubscribe — baja el dispositivo.
   app.post('/push/unsubscribe', { preHandler: requireRifero }, async (request, reply) => {
     const { endpoint } = request.body as { endpoint?: string };
     if (endpoint) await removeSubscription(endpoint);
-    reply.send({ ok: true });
+    return reply.send({ ok: true });
   });
 }

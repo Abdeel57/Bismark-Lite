@@ -7,7 +7,7 @@ import { requireRifero } from '../../middlewares/auth.js';
 import { loadOwnedRaffle } from '../../lib/ownership.js';
 import { getPlanContext } from '../../lib/plan.js';
 import { newOrderCode } from '../../lib/codes.js';
-import { toBuyerDTO } from '../../lib/serializers.js';
+import { toBuyerDTO, riferoPaymentMethods } from '../../lib/serializers.js';
 import { logActivity } from '../../lib/activity.js';
 import { sendNewOrderEmail } from '../../lib/mailer.js';
 import { sendPushToUser } from '../../lib/push.js';
@@ -141,7 +141,7 @@ export default async function ticketsRoutes(app: FastifyInstance): Promise<void>
         url: `${env.publicWebUrl}/panel/admin/ordenes`,
       });
 
-      reply.code(201).send({
+      return reply.code(201).send({
         receipt: {
           code: result.order.code,
           raffleTitle: raffle.title,
@@ -161,6 +161,7 @@ export default async function ticketsRoutes(app: FastifyInstance): Promise<void>
             concept: profile.payConcept,
             instructions: profile.payInstructions || raffle.paymentInstructions,
             whatsapp: profile.payWhatsapp || profile.whatsapp,
+            methods: riferoPaymentMethods(profile),
           },
         },
       });

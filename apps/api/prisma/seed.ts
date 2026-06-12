@@ -55,13 +55,15 @@ async function main() {
   console.log('🌱 Sembrando datos de Bismark...');
 
   // ── Planes ────────────────────────────────────────────────
+  // Precio anual = 10 meses (2 meses gratis).
   const basico = await prisma.plan.upsert({
     where: { slug: PLAN_SLUGS.BASIC },
-    update: {},
+    update: { price: 499, priceYearly: 4990 },
     create: {
       name: 'Plan Básico',
       slug: PLAN_SLUGS.BASIC,
       price: 499,
+      priceYearly: 4990,
       currency: 'MXN',
       billingPeriod: 'monthly',
       maxActiveRaffles: 1,
@@ -91,11 +93,12 @@ async function main() {
 
   const pro = await prisma.plan.upsert({
     where: { slug: PLAN_SLUGS.PRO },
-    update: {},
+    update: { price: 1499, priceYearly: 14990 },
     create: {
       name: 'Plan Pro',
       slug: PLAN_SLUGS.PRO,
-      price: 999,
+      price: 1499,
+      priceYearly: 14990,
       currency: 'MXN',
       billingPeriod: 'monthly',
       maxActiveRaffles: 5,
@@ -125,11 +128,12 @@ async function main() {
 
   const verificado = await prisma.plan.upsert({
     where: { slug: PLAN_SLUGS.VERIFIED },
-    update: {},
+    update: { price: 2999, priceYearly: 29990 },
     create: {
       name: 'Plan Verificado',
       slug: PLAN_SLUGS.VERIFIED,
-      price: 1999,
+      price: 2999,
+      priceYearly: 29990,
       currency: 'MXN',
       billingPeriod: 'monthly',
       maxActiveRaffles: 15,

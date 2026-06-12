@@ -52,6 +52,7 @@ export function toPlanDTO(plan: Plan): PlanDTO {
     name: plan.name,
     slug: plan.slug,
     price: plan.price,
+    priceYearly: plan.priceYearly,
     currency: plan.currency,
     billingPeriod: plan.billingPeriod,
     maxActiveRaffles: plan.maxActiveRaffles,

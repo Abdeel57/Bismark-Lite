@@ -193,6 +193,7 @@ export const planSchema = z.object({
   name: z.string().min(2).max(80),
   slug: z.string().min(2).max(40),
   price: z.number().int().min(0),
+  priceYearly: z.number().int().min(0).nullable().default(null),
   currency: z.string().default('MXN'),
   billingPeriod: z.string().default('monthly'),
   maxActiveRaffles: z.number().int().min(0),

@@ -95,6 +95,7 @@ export default function AdminPlans() {
 interface EditableState {
   name: string;
   price: string;
+  priceYearly: string;
   maxActiveRaffles: string;
   maxTicketsPerRaffle: string;
   features: string;
@@ -105,6 +106,7 @@ function toEditable(plan: PlanDTO): EditableState {
   return {
     name: plan.name,
     price: String(plan.price),
+    priceYearly: plan.priceYearly != null ? String(plan.priceYearly) : '',
     maxActiveRaffles: String(plan.maxActiveRaffles),
     maxTicketsPerRaffle: String(plan.maxTicketsPerRaffle),
     features: plan.features.join('\n'),
@@ -137,6 +139,7 @@ function PlanEditorCard({ plan }: { plan: PlanDTO }) {
       planService.update(plan.id, {
         name: state.name,
         price: Number(state.price) || 0,
+        priceYearly: state.priceYearly.trim() === '' ? null : Number(state.priceYearly) || 0,
         maxActiveRaffles: Number(state.maxActiveRaffles) || 0,
         maxTicketsPerRaffle: Number(state.maxTicketsPerRaffle) || 0,
         features: state.features
@@ -172,7 +175,10 @@ function PlanEditorCard({ plan }: { plan: PlanDTO }) {
           <Badge variant={isActive ? 'success' : 'muted'}>{isActive ? 'Activo' : 'Inactivo'}</Badge>
         </div>
         <CardDescription>
-          {formatMXN(Number(state.price) || 0)} / {plan.billingPeriod} · /{plan.slug}
+          {formatMXN(Number(state.price) || 0)} / mes
+          {state.priceYearly.trim() !== '' && ` · ${formatMXN(Number(state.priceYearly) || 0)} / año`}
+          {' · /'}
+          {plan.slug}
         </CardDescription>
       </CardHeader>
 
@@ -188,7 +194,7 @@ function PlanEditorCard({ plan }: { plan: PlanDTO }) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label htmlFor={`price-${plan.id}`}>Precio (MXN)</Label>
+            <Label htmlFor={`price-${plan.id}`}>Precio mensual (MXN)</Label>
             <Input
               id={`price-${plan.id}`}
               type="number"
@@ -197,6 +203,20 @@ function PlanEditorCard({ plan }: { plan: PlanDTO }) {
               onChange={(e) => setState((s) => ({ ...s, price: e.target.value }))}
             />
           </div>
+          <div>
+            <Label htmlFor={`price-yearly-${plan.id}`}>Precio anual (MXN)</Label>
+            <Input
+              id={`price-yearly-${plan.id}`}
+              type="number"
+              min={0}
+              placeholder="Vacío = sin anual"
+              value={state.priceYearly}
+              onChange={(e) => setState((s) => ({ ...s, priceYearly: e.target.value }))}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <div>
             <Label htmlFor={`raffles-${plan.id}`}>Rifas activas máx.</Label>
             <Input
@@ -207,17 +227,16 @@ function PlanEditorCard({ plan }: { plan: PlanDTO }) {
               onChange={(e) => setState((s) => ({ ...s, maxActiveRaffles: e.target.value }))}
             />
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor={`tickets-${plan.id}`}>Boletos máx. por rifa</Label>
-          <Input
-            id={`tickets-${plan.id}`}
-            type="number"
-            min={0}
-            value={state.maxTicketsPerRaffle}
-            onChange={(e) => setState((s) => ({ ...s, maxTicketsPerRaffle: e.target.value }))}
-          />
+          <div>
+            <Label htmlFor={`tickets-${plan.id}`}>Boletos máx. por rifa</Label>
+            <Input
+              id={`tickets-${plan.id}`}
+              type="number"
+              min={0}
+              value={state.maxTicketsPerRaffle}
+              onChange={(e) => setState((s) => ({ ...s, maxTicketsPerRaffle: e.target.value }))}
+            />
+          </div>
         </div>
 
         <Separator />
@@ -286,6 +305,7 @@ function NewPlanDialog() {
       name: '',
       slug: '',
       price: 0,
+      priceYearly: null,
       currency: 'MXN',
       billingPeriod: 'monthly',
       maxActiveRaffles: 1,
@@ -366,12 +386,30 @@ function NewPlanDialog() {
             {errors.slug && <p className="mt-1 text-sm text-destructive">{errors.slug.message}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="np-price">Precio</Label>
+              <Label htmlFor="np-price">Precio mensual</Label>
               <Input id="np-price" type="number" min={0} {...register('price', { valueAsNumber: true })} />
               {errors.price && <p className="mt-1 text-sm text-destructive">{errors.price.message}</p>}
             </div>
+            <div>
+              <Label htmlFor="np-price-yearly">Precio anual</Label>
+              <Input
+                id="np-price-yearly"
+                type="number"
+                min={0}
+                placeholder="Vacío = sin anual"
+                {...register('priceYearly', {
+                  setValueAs: (v) => (v === '' || v == null ? null : Number(v)),
+                })}
+              />
+              {errors.priceYearly && (
+                <p className="mt-1 text-sm text-destructive">{errors.priceYearly.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="np-raffles">Rifas máx.</Label>
               <Input

@@ -222,7 +222,8 @@ model Plan {
   id            String     @id @default(cuid())
   name          String
   slug          String     @unique
-  price         Int // MXN pesos enteros
+  price         Int // MXN pesos enteros (mensual)
+  priceYearly   Int? // MXN pesos enteros (anual); null = sin opción anual
   currency      String     @default("MXN")
   billingPeriod String     @default("monthly")
 

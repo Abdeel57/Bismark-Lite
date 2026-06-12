@@ -126,6 +126,11 @@ export default function Plan() {
                   {formatMXN(plan.price)}
                   <span className="text-sm font-medium text-muted-foreground"> / mes</span>
                 </p>
+                {plan.priceYearly != null && (
+                  <p className="text-sm font-medium text-emerald-600">
+                    o {formatMXN(plan.priceYearly)} al año (2 meses gratis)
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="pt-0">
                 <ul className="flex flex-col gap-2">

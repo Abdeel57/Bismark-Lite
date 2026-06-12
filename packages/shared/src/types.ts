@@ -40,6 +40,7 @@ export interface PlanDTO {
   name: string;
   slug: string;
   price: number;
+  priceYearly: number | null;
   currency: string;
   billingPeriod: string;
   maxActiveRaffles: number;

@@ -30,6 +30,7 @@ export default async function plansRoutes(app: FastifyInstance): Promise<void> {
         name: data.name,
         slug: data.slug || slugify(data.name),
         price: data.price,
+        priceYearly: data.priceYearly,
         currency: data.currency,
         billingPeriod: data.billingPeriod,
         maxActiveRaffles: data.maxActiveRaffles,

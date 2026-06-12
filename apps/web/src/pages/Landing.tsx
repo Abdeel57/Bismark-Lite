@@ -380,10 +380,10 @@ const PLAN_META: Record<string, { ideal: string; icon: typeof Crown; popular?: b
   verificado: { ideal: 'Para riferos serios con más volumen', icon: Crown },
 };
 
-const FALLBACK_PLANS: Pick<PlanDTO, 'name' | 'slug' | 'price' | 'features'>[] = [
-  { name: 'Plan Básico', slug: 'basico', price: 499, features: ['1 rifa activa', 'Hasta 500 boletos', 'Página personalizada', 'Subdominio propio', 'Boleto digital', 'Pagos manuales'] },
-  { name: 'Plan Pro', slug: 'pro', price: 999, features: ['Hasta 5 rifas activas', 'Hasta 3,000 boletos', 'Subida de comprobantes', 'Varios ganadores', 'Reportes Excel y PDF', 'Mensajes de WhatsApp'] },
-  { name: 'Plan Verificado', slug: 'verificado', price: 1999, features: ['Hasta 15 rifas activas', 'Hasta 10,000 boletos', 'Palomita azul de verificación', 'Tómbola digital', 'Publicación de ganadores', 'Personalización premium'] },
+const FALLBACK_PLANS: Pick<PlanDTO, 'name' | 'slug' | 'price' | 'priceYearly' | 'features'>[] = [
+  { name: 'Plan Básico', slug: 'basico', price: 499, priceYearly: 4990, features: ['1 rifa activa', 'Hasta 500 boletos', 'Página personalizada', 'Subdominio propio', 'Boleto digital', 'Pagos manuales'] },
+  { name: 'Plan Pro', slug: 'pro', price: 1499, priceYearly: 14990, features: ['Hasta 5 rifas activas', 'Hasta 3,000 boletos', 'Subida de comprobantes', 'Varios ganadores', 'Reportes Excel y PDF', 'Mensajes de WhatsApp'] },
+  { name: 'Plan Verificado', slug: 'verificado', price: 2999, priceYearly: 29990, features: ['Hasta 15 rifas activas', 'Hasta 10,000 boletos', 'Palomita azul de verificación', 'Tómbola digital', 'Publicación de ganadores', 'Personalización premium'] },
 ];
 
 // JSON-LD del FAQ para resultados enriquecidos en Google.
@@ -401,6 +401,7 @@ const FAQ_LD = JSON.stringify({
 export default function Landing() {
   useDocumentTitle('Bismark — Crea tu página de rifas');
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
   const { data } = useQuery({ queryKey: ['plans'], queryFn: planService.list });
   const plans = data?.items?.length ? data.items : FALLBACK_PLANS;
 
@@ -696,9 +697,39 @@ export default function Landing() {
       <section id="planes" className={cn(PAPER)}>
         <div className="mx-auto max-w-6xl px-4 py-20 sm:py-24">
           <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-            <Folio n="05" label="Planes mensuales" />
+            <Folio n="05" label="Planes" />
             <h2 className="font-display text-3xl font-extrabold tracking-tight sm:text-5xl">Elige tu boleto de entrada</h2>
             <p className="mt-3 text-muted-foreground">Sin comisión por boleto. Cambia de plan cuando crezcas.</p>
+            <div className={cn('mt-6 inline-flex items-center rounded-full border p-1', PAPER_CARD, PAPER_BORDER)}>
+              <button
+                type="button"
+                onClick={() => setBilling('monthly')}
+                className={cn(
+                  'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                  billing === 'monthly' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Mensual
+              </button>
+              <button
+                type="button"
+                onClick={() => setBilling('yearly')}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                  billing === 'yearly' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                Anual
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 py-0.5 font-ticket text-[9px] font-bold uppercase tracking-[0.12em]',
+                    billing === 'yearly' ? 'bg-brand-mint text-brand-ink' : 'bg-brand/10 text-brand',
+                  )}
+                >
+                  2 meses gratis
+                </span>
+              </button>
+            </div>
           </Reveal>
 
           <div className="grid items-stretch gap-6 lg:grid-cols-3">
@@ -706,6 +737,9 @@ export default function Landing() {
               const meta = PLAN_META[plan.slug] ?? { ideal: '' };
               const popular = meta.popular;
               const verified = plan.slug === 'verificado';
+              const yearly = billing === 'yearly' && plan.priceYearly != null;
+              const displayPrice = yearly ? (plan.priceYearly ?? plan.price) : plan.price;
+              const savings = yearly ? plan.price * 12 - (plan.priceYearly ?? 0) : 0;
               return (
                 <Reveal key={plan.slug} delay={i * 90} className="h-full">
                   <div
@@ -745,10 +779,17 @@ export default function Landing() {
 
                     <div className="relative mt-6 flex items-end gap-1.5">
                       <span className="font-wide text-[2.6rem] font-black leading-none tracking-tight" style={{ fontStretch: '125%' }}>
-                        {formatMXN(plan.price)}
+                        {formatMXN(displayPrice)}
                       </span>
-                      <span className={cn('mb-1 text-sm font-medium', popular ? 'text-white/55' : 'text-muted-foreground')}>/mes</span>
+                      <span className={cn('mb-1 text-sm font-medium', popular ? 'text-white/55' : 'text-muted-foreground')}>
+                        {yearly ? '/año' : '/mes'}
+                      </span>
                     </div>
+                    {yearly && savings > 0 && (
+                      <p className={cn('relative mt-2 text-xs font-semibold', popular ? 'text-brand-mint' : 'text-emerald-600')}>
+                        Equivale a {formatMXN(Math.round((plan.priceYearly ?? 0) / 12))}/mes · ahorras {formatMXN(savings)}
+                      </p>
+                    )}
 
                     {/* Perforación con muescas */}
                     <div className="relative -mx-7 my-6">

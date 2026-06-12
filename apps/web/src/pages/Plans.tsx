@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Check, X, Star, Info, ArrowRight } from 'lucide-react';
@@ -27,7 +28,62 @@ function limitLabel(value: number, singular: string, plural: string): string {
   return `${value.toLocaleString('es-MX')} ${value === 1 ? singular : plural}`;
 }
 
-function PlanCard({ plan, popular }: { plan: PlanDTO; popular: boolean }) {
+export type BillingPeriod = 'monthly' | 'yearly';
+
+export function BillingToggle({
+  value,
+  onChange,
+  className,
+}: {
+  value: BillingPeriod;
+  onChange: (value: BillingPeriod) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn('inline-flex items-center rounded-full border bg-card p-1', className)}>
+      <button
+        type="button"
+        onClick={() => onChange('monthly')}
+        className={cn(
+          'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+          value === 'monthly' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Mensual
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('yearly')}
+        className={cn(
+          'flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+          value === 'yearly' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground',
+        )}
+      >
+        Anual
+        <span
+          className={cn(
+            'rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+            value === 'yearly' ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600',
+          )}
+        >
+          2 meses gratis
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function PlanCard({
+  plan,
+  popular,
+  period,
+}: {
+  plan: PlanDTO;
+  popular: boolean;
+  period: BillingPeriod;
+}) {
+  const yearly = period === 'yearly' && plan.priceYearly != null;
+  const savings = yearly ? plan.price * 12 - (plan.priceYearly ?? 0) : 0;
   return (
     <Card
       className={cn(
@@ -45,9 +101,17 @@ function PlanCard({ plan, popular }: { plan: PlanDTO; popular: boolean }) {
       <CardContent className="flex flex-1 flex-col p-6">
         <h3 className="text-2xl font-extrabold tracking-tight">{plan.name}</h3>
         <div className="mt-3 flex items-end gap-1">
-          <span className="text-4xl font-extrabold tracking-tight">{formatMXN(plan.price)}</span>
-          <span className="mb-1 text-sm text-muted-foreground">/ mes</span>
+          <span className="text-4xl font-extrabold tracking-tight">
+            {formatMXN(yearly ? (plan.priceYearly ?? plan.price) : plan.price)}
+          </span>
+          <span className="mb-1 text-sm text-muted-foreground">{yearly ? '/ año' : '/ mes'}</span>
         </div>
+        {yearly && savings > 0 && (
+          <p className="mt-1.5 text-sm font-medium text-emerald-600">
+            Equivale a {formatMXN(Math.round((plan.priceYearly ?? 0) / 12))} al mes · ahorras{' '}
+            {formatMXN(savings)} al año
+          </p>
+        )}
 
         {/* Límites */}
         <div className="mt-5 grid grid-cols-2 gap-3">
@@ -134,6 +198,7 @@ function PlanSkeleton() {
 }
 
 export default function Plans() {
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
   const { data, isLoading } = useQuery({
     queryKey: ['plans'],
     queryFn: planService.list,
@@ -164,6 +229,7 @@ export default function Plans() {
           <p className="mt-3 text-lg text-muted-foreground">
             Elige el plan que se ajusta a tus rifas. Puedes cambiar de plan cuando lo necesites.
           </p>
+          <BillingToggle value={period} onChange={setPeriod} className="mt-6" />
         </div>
 
         {/* ── Tarjetas ── */}
@@ -171,7 +237,12 @@ export default function Plans() {
           {isLoading
             ? Array.from({ length: 3 }).map((_, i) => <PlanSkeleton key={i} />)
             : plans.map((plan, i) => (
-                <PlanCard key={plan.id} plan={plan} popular={plans.length === 3 ? i === 1 : false} />
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  popular={plans.length === 3 ? i === 1 : false}
+                  period={period}
+                />
               ))}
         </div>
 

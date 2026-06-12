@@ -1,9 +1,59 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { formatTicketNumber, PLAN_SLUGS, newOrderCodeFallback } from './seed-helpers.js';
 
+// Carga .env y, en producción, .env.production (para conocer LOCAL_UPLOAD_DIR y demás).
+loadEnv();
+if (process.env.NODE_ENV === 'production') {
+  loadEnv({ path: fileURLToPath(new URL('../.env.production', import.meta.url)) });
+}
+
 const prisma = new PrismaClient();
+
+// Métodos de pago del rifero demo (BBVA / OXXO / Nu).
+const DEMO_PAYMENT_METHODS = [
+  { id: 'demo-bbva', bank: 'BBVA', clabe: '012345678901234567', concept: 'Folio de tu orden', cardNumber: '4152313800000000', holderName: 'Carlos Demo', instructions: '' },
+  { id: 'demo-oxxo', bank: 'OXXO', clabe: '', concept: 'Folio de tu orden', cardNumber: '4766840012345678', holderName: 'Carlos Demo', instructions: 'Deposita en cualquier OXXO con el número de tarjeta.' },
+  { id: 'demo-nu', bank: 'Nu', clabe: '638180000012345678', concept: '', cardNumber: '', holderName: 'Carlos Demo', instructions: '' },
+];
+
+// Cartel (texto enriquecido) de la rifa demo GMC Denali (E2).
+const GMC_DESCRIPTION = [
+  '<div style="font-weight:800;font-size:large;">CON TU BOLETO <span style="color:#16a34a;">LIQUIDADO</span> PARTICIPAS POR:</div>',
+  '<div style="font-weight:800;font-size:x-large;color:#16a34a;">🛻 GMC SIERRA DENALI 2026</div>',
+  '<div style="font-weight:800;">0 KM · ROJA · ENGANCHE A TU NOMBRE</div>',
+  '<div style="font-weight:800;">+ $50,000 MXN EN EFECTIVO</div>',
+  '<div><br></div>',
+  '<div style="font-weight:700;">DEL 2DO AL 10MO LUGAR</div>',
+  '<div style="font-weight:800;color:#16a34a;font-size:large;">$5,000 MXN CADA UNO</div>',
+  '<div><br></div>',
+  '<div style="font-weight:800;font-size:large;color:#dc2626;">🔥 BONO PRONTO PAGO</div>',
+  '<div>te llevas <span style="font-weight:800;color:#16a34a;">$30,000 MXN</span> extra si liquidas</div>',
+  '<div>tu boleto antes de 12 hrs de apartado</div>',
+  '<div><br></div>',
+  '<div style="font-weight:800;font-size:large;color:#7c3aed;">💎 BONO DENALI $100,000 MXN</div>',
+  '<div>comprando más de 10 boletos en una sola exhibición</div>',
+  '<div style="font-weight:700;">¡NO DESPRECIES TUS BOLETOS!</div>',
+].join('');
+
+// Copia una imagen del demo (versionada en prisma/demo-assets) al directorio de
+// uploads (en prod = el volumen montado en /data/uploads). Idempotente.
+function copyDemoAsset(rel: string) {
+  const src = fileURLToPath(new URL(`./demo-assets/${rel}`, import.meta.url));
+  if (!existsSync(src)) {
+    console.warn('⚠ imagen demo no encontrada:', src);
+    return;
+  }
+  const uploadDir = process.env.LOCAL_UPLOAD_DIR || './uploads';
+  const dest = resolve(uploadDir, rel);
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(src, dest);
+  console.log('✓ imagen demo copiada →', dest);
+}
 
 const env = {
   adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@bismark.com',
@@ -160,6 +210,7 @@ async function main() {
       logoUrl: '/uploads/logos/demo-rifasdelasuerte-logo.png',
       logoScale: 200,
       logoGlow: true,
+      paymentMethods: DEMO_PAYMENT_METHODS,
     },
     create: {
       userId: riferoUser.id,
@@ -183,6 +234,7 @@ async function main() {
       payConcept: 'Folio de tu orden',
       payInstructions: 'Realiza tu transferencia o depósito y envía tu comprobante por WhatsApp con tu folio.',
       payWhatsapp: '5551234567',
+      paymentMethods: DEMO_PAYMENT_METHODS,
       defaultReserveMinutes: 120,
       allowProofUpload: true,
       showWinners: true,
@@ -293,6 +345,54 @@ async function main() {
 
     console.log('✓ Rifa demo E1 creada con 100 boletos (10 pagados, 5 apartados)');
   }
+
+  // ── Rifa demo (E2) — GMC Denali, la rifa estrella del demo ─
+  const existingE2 = await prisma.raffle.findFirst({ where: { riferoId: profile.id, eventNumber: 2 } });
+  if (!existingE2) {
+    const totalE2 = 9999;
+    const priceE2 = 200;
+    const drawE2 = new Date();
+    drawE2.setDate(drawE2.getDate() + 30);
+
+    const gmc = await prisma.raffle.create({
+      data: {
+        riferoId: profile.id,
+        eventNumber: 2,
+        title: 'GMC Denali 2026',
+        slug: 'camioneta-2024',
+        description: GMC_DESCRIPTION,
+        prize: 'GMC Sierra Denali 2026',
+        ticketPrice: priceE2,
+        totalTickets: totalE2,
+        ticketFormat: 4,
+        ticketStart: 1,
+        ticketEnd: totalE2,
+        drawDate: drawE2,
+        status: 'PUBLISHED',
+        paymentInstructions: profile.payInstructions,
+        reserveMinutes: 120,
+        allowWinnerPublication: true,
+        useDigitalDraw: true,
+        images: { create: [{ url: '/uploads/covers/demo-gmc-2026.jpg', sortOrder: 0 }] },
+      },
+    });
+
+    // Generar los 9,999 boletos disponibles en lotes.
+    const allE2 = Array.from({ length: totalE2 }, (_, i) => ({
+      raffleId: gmc.id,
+      number: i + 1,
+      displayNumber: formatTicketNumber(i + 1, 4),
+    }));
+    const BATCH = 2000;
+    for (let s = 0; s < allE2.length; s += BATCH) {
+      await prisma.ticketNumber.createMany({ data: allE2.slice(s, s + BATCH) });
+    }
+    console.log(`✓ Rifa demo E2 (GMC Denali 2026) creada con ${totalE2} boletos`);
+  }
+
+  // ── Imágenes del demo → directorio de uploads (volumen en prod) ─
+  copyDemoAsset('logos/demo-rifasdelasuerte-logo.png');
+  copyDemoAsset('covers/demo-gmc-2026.jpg');
 
   // ── Settings globales ─────────────────────────────────────
   await prisma.platformSettings.upsert({

@@ -34,7 +34,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Separator, PageLoader } from '@/components/ui/misc';
+import { Separator } from '@/components/ui/misc';
+import { BrandLoader } from '@/components/brand/BrandLoader';
 import {
   Dialog,
   DialogContent,
@@ -185,11 +186,7 @@ export default function PublicRaffle({ subdomain }: Props) {
   useDocumentTitle(raffle ? `${raffle.title} · ${raffle.rifero.publicName}` : undefined);
 
   if (isLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center">
-        <PageLoader label="Cargando rifa..." />
-      </div>
-    );
+    return <BrandLoader />;
   }
 
   if (isError || !data || data.active === false || !raffle) {
@@ -423,7 +420,7 @@ export default function PublicRaffle({ subdomain }: Props) {
             </button>
 
             {ticketsQuery.isLoading ? (
-              <PageLoader label="Cargando boletos..." />
+              <BrandLoader fullScreen={false} />
             ) : (
               <TicketGrid
                 tickets={ticketsQuery.data?.items ?? []}

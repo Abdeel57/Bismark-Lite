@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth';
 import { detectRiferoSubdomain } from '@/lib/site';
-import { PageLoader } from '@/components/ui/misc';
+import { BrandLoader } from '@/components/brand/BrandLoader';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { OwnerShell } from '@/components/owner/OwnerShell';
 import { AdminDrawer } from '@/components/owner/AdminDrawer';
@@ -50,11 +50,7 @@ const AdminSubscriptions = lazy(() => import('@/pages/admin/AdminSubscriptions')
 const AdminPlans = lazy(() => import('@/pages/admin/AdminPlans'));
 
 function Fallback() {
-  return (
-    <div className="grid min-h-screen place-items-center">
-      <PageLoader />
-    </div>
-  );
+  return <BrandLoader />;
 }
 
 // Router cuando se accede por subdominio de rifero (prod).

@@ -14,7 +14,8 @@ import { publicService, type PublicRiferoWinner } from '@/services/publicSite';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader, EmptyState } from '@/components/ui/misc';
+import { EmptyState } from '@/components/ui/misc';
+import { BrandLoader } from '@/components/brand/BrandLoader';
 import { RiferoTheme } from '@/components/brand/RiferoTheme';
 import { VerifiedBadge } from '@/components/brand/VerifiedBadge';
 import { FacebookIcon, InstagramIcon, TiktokIcon, WhatsappIcon } from '@/components/brand/SocialIcons';
@@ -238,11 +239,7 @@ export default function PublicRifero({ subdomain, previewData }: Props) {
   useDocumentTitle(data?.rifero?.publicName ?? data?.publicName);
 
   if (!previewData && query.isLoading) {
-    return (
-      <div className="grid min-h-screen place-items-center">
-        <PageLoader label="Cargando página..." />
-      </div>
-    );
+    return <BrandLoader />;
   }
 
   if (isError || !data || data.active === false || !data.rifero) {

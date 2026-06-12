@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Ticket as TicketIcon, AlertCircle, ShieldCheck, WifiOff, Home } from 'lucide-react';
 import { formatDateTimeMX } from '@bismark/shared';
 import { publicService } from '@/services/publicSite';
-import { PageLoader } from '@/components/ui/misc';
+import { BrandLoader } from '@/components/brand/BrandLoader';
 import { Button } from '@/components/ui/button';
 import { OrderStatusBadge } from '@/lib/statusBadges';
 import { RiferoTheme } from '@/components/brand/RiferoTheme';
@@ -37,11 +37,7 @@ export default function RiferoPayment() {
   useDocumentTitle(ticket ? `Tu pago · ${ticket.riferoPublicName}` : undefined);
 
   if ((isLoading || checking) && !ticket) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-background">
-        <PageLoader label="Cargando tu pago..." />
-      </div>
-    );
+    return <BrandLoader />;
   }
 
   if (!ticket) {

@@ -1,0 +1,36 @@
+<!doctype html>
+<!-- Vista previa estática del BrandLoader (mismo CSS que index.css). -->
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<style>
+  body { margin: 0; }
+  .overlay {
+    position: fixed; inset: 0; display: grid; place-items: center;
+    background-color: #070b18;
+    background-image: radial-gradient(560px circle at 50% 50%, rgba(26,77,255,0.12), transparent 65%);
+  }
+  .logo-box { position: relative; height: 80px; width: 80px; }
+  .logo-box img { height: 100%; width: 100%; object-fit: contain; filter: invert(1); opacity: 0.8; }
+  @keyframes brand-shine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+  .brand-loader-shine {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(115deg, transparent 40%, rgba(135,166,255,0.5) 46%, rgba(255,255,255,0.95) 50%, rgba(135,166,255,0.5) 54%, transparent 60%);
+    background-size: 200% 100%; background-repeat: no-repeat;
+    animation: brand-shine 1.9s ease-in-out infinite;
+    -webkit-mask-image: url('../apps/web/src/assets/bismark-logo.png');
+    -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;
+    mask-image: url('../apps/web/src/assets/bismark-logo.png');
+    mask-size: contain; mask-repeat: no-repeat; mask-position: center;
+  }
+</style>
+</head>
+<body>
+  <div class="overlay">
+    <div class="logo-box">
+      <img src="../apps/web/src/assets/bismark-logo.png" alt="" />
+      <div class="brand-loader-shine"></div>
+    </div>
+  </div>
+</body>
+</html>

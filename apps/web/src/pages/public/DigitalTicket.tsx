@@ -6,7 +6,7 @@ import { apiAssetUrl } from '@/lib/api';
 import { publicService } from '@/services/publicSite';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/misc';
+import { BrandLoader } from '@/components/brand/BrandLoader';
 import { OrderStatusBadge } from '@/lib/statusBadges';
 import { Logo } from '@/components/brand/Logo';
 import { ThemeToggle } from '@/components/brand/ThemeToggle';
@@ -46,7 +46,7 @@ export default function DigitalTicket() {
 
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-8">
         {(isLoading || checking) && !ticket ? (
-          <PageLoader label="Cargando boleto..." />
+          <BrandLoader fullScreen={false} />
         ) : !ticket ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-12 text-center">

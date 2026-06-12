@@ -161,6 +161,29 @@
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   }
+  /* Destello que barre el monograma (BrandLoader). La capa va recortada a la
+     silueta del logo (mask en el componente); aquí solo viaja el brillo. */
+  @keyframes brand-shine {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  .brand-loader-shine {
+    background-image: linear-gradient(
+      115deg,
+      transparent 40%,
+      rgba(135, 166, 255, 0.5) 46%,
+      rgba(255, 255, 255, 0.95) 50%,
+      rgba(135, 166, 255, 0.5) 54%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    background-repeat: no-repeat;
+    animation: brand-shine 1.9s ease-in-out infinite;
+  }
   /* Gradiente de texto de marca */
   .text-gradient-brand {
     background: linear-gradient(120deg, #fff 20%, #6fa0ff 55%, #1a4dff 100%);

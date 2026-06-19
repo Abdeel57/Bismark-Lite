@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { VerifiedBadge } from '@/components/brand/VerifiedBadge';
 import { apiAssetUrl } from '@/lib/api';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
+import { cn } from '@/lib/cn';
 
 // Barra/cintillo fijo con la marca del rifero (logo centrado que sobresale, glow,
 // palomita) y dos acciones laterales configurables. Se usa en la página de la rifa
@@ -25,6 +27,9 @@ interface Props {
   riferoHref: string; // a dónde lleva el logo
   left: BarAction;
   right: BarAction;
+  /** Controla el auto-ocultado desde la página (para sincronizar promo/panel).
+   *  Si se omite, la barra se gestiona sola con el scroll. */
+  hidden?: boolean;
 }
 
 const SIDE_CLS =
@@ -71,6 +76,7 @@ export function RaffleBrandBar({
   riferoHref,
   left,
   right,
+  hidden: hiddenProp,
 }: Props) {
   // El logo escala SOLO el ícono; la barra mantiene altura fija. El logo se centra
   // (su margen transparente sobresale invisible) y su tope es la línea de arriba.
@@ -79,8 +85,20 @@ export function RaffleBrandBar({
   const logoTopOffset = centeredTop - 8;
   const badgeTopPx = Math.max(2, -centeredTop + 2);
 
+  // Auto-ocultado al hacer scroll: se desliza al bajar y reaparece al subir o
+  // detenerse. La página puede controlarlo (prop `hidden`) para mover en sincronía
+  // la promo y el panel de selección que viven justo debajo.
+  const autoHidden = useHideOnScroll();
+  const hidden = hiddenProp ?? autoHidden;
+
   return (
-    <div className="sticky top-0 z-50 border-y-[8px] border-[var(--rifero-primary)] bg-zinc-950/95 text-white shadow-[0_9px_22px_-6px_rgba(0,0,0,0.5)] backdrop-blur">
+    <div
+      className={cn(
+        'sticky top-0 z-50 border-y-[8px] border-[var(--rifero-primary)] bg-zinc-950/95 text-white shadow-[0_9px_22px_-6px_rgba(0,0,0,0.5)] backdrop-blur',
+        'transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform',
+        hidden ? '-translate-y-full' : 'translate-y-0',
+      )}
+    >
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-2 px-3" style={{ height: BAR_CORE }}>
         <SideButton action={left} />
 

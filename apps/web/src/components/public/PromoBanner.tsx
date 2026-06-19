@@ -16,6 +16,7 @@ export function PromoBanner({
   colorTo,
   sticky = false,
   topPx = 0,
+  hidden = false,
 }: {
   title: string;
   subtitle?: string | null;
@@ -23,13 +24,19 @@ export function PromoBanner({
   colorTo?: string | null;
   sticky?: boolean;
   topPx?: number;
+  /** Cuando el cintillo se oculta, la promo sube `topPx` para quedar pegada
+   *  al borde superior (sin hueco). Solo aplica si es `sticky`. */
+  hidden?: boolean;
 }) {
   return (
     <div
-      className={cn('relative w-full overflow-hidden text-center text-white shadow-md', sticky && 'sticky z-30')}
+      className={cn(
+        'relative w-full overflow-hidden text-center text-white shadow-md',
+        sticky && 'sticky z-30 transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform',
+      )}
       style={{
         background: `linear-gradient(100deg, ${colorFrom || DEFAULT_FROM}, ${colorTo || DEFAULT_TO})`,
-        ...(sticky ? { top: topPx } : {}),
+        ...(sticky ? { top: topPx, transform: hidden ? `translateY(-${topPx}px)` : 'translateY(0)' } : {}),
       }}
     >
       <p className="px-4 py-1.5 font-display text-sm font-extrabold uppercase tracking-wide [text-shadow:0_1px_2px_rgba(0,0,0,0.3)] sm:text-base">

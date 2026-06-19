@@ -38,6 +38,7 @@ import { track } from '@/lib/analytics';
 import { publicService } from '@/services/publicSite';
 import { ticketService } from '@/services/tickets';
 import { useDocumentTitle } from '@/hooks/useDocumentTitle';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -216,6 +217,9 @@ export default function PublicRaffle({ subdomain }: Props) {
   // La pestaña muestra el nombre de la página de rifas, no el del evento.
   useDocumentTitle(raffle?.rifero.publicName);
 
+  // Cintillo + promo + panel se ocultan/reaparecen en sincronía al hacer scroll.
+  const barHidden = useHideOnScroll();
+
   if (isLoading) {
     return <BrandLoader />;
   }
@@ -331,6 +335,7 @@ export default function PublicRaffle({ subdomain }: Props) {
           riferoHref={riferoHref}
           left={{ line1: 'Métodos', line2: 'de pago', onClick: () => setPayOpen(true) }}
           right={{ line1: 'Sube tu', line2: 'pago aquí', href: verificarHref, pulse: true }}
+          hidden={barHidden}
         />
 
         {/* ── Promoción/aviso de la rifa (se configura en el panel: Promociones).
@@ -344,14 +349,15 @@ export default function PublicRaffle({ subdomain }: Props) {
             colorTo={raffle.promoColorTo}
             sticky={selected.length === 0}
             topPx={BAR_TOTAL}
+            hidden={barHidden}
           />
         )}
 
         {/* ── Panel de selección flotante (se mantiene arriba al deslizar) ── */}
         {selected.length > 0 && (
           <div
-            className="fixed inset-x-0 z-40 animate-fade-in border-b-4 border-[var(--rifero-primary)] bg-zinc-950/95 text-white shadow-[0_16px_30px_-6px_rgba(0,0,0,0.55)] backdrop-blur"
-            style={{ top: panelTopPx }}
+            className="fixed inset-x-0 z-40 animate-fade-in border-b-4 border-[var(--rifero-primary)] bg-zinc-950/95 text-white shadow-[0_16px_30px_-6px_rgba(0,0,0,0.55)] backdrop-blur transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform"
+            style={{ top: panelTopPx, transform: barHidden ? `translateY(-${BAR_TOTAL}px)` : undefined }}
           >
             <div className="mx-auto max-w-2xl px-4 py-2.5">
               <button

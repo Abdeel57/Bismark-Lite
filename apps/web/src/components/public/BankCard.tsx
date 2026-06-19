@@ -61,8 +61,8 @@ export function BankCard({ method }: { method: PaymentMethodDTO }) {
   return (
     <div>
       <div
-        className="relative overflow-hidden rounded-2xl p-4 shadow-[0_16px_40px_-14px_rgba(0,0,0,0.45)] sm:p-5"
-        style={{ background: theme.bg, color: fg, aspectRatio: '1.66', maxHeight: 240 }}
+        className="relative flex flex-col overflow-hidden rounded-2xl p-4 shadow-[0_16px_40px_-14px_rgba(0,0,0,0.45)] sm:p-5"
+        style={{ background: theme.bg, color: fg, minHeight: 200 }}
       >
         {/* Texturas: grano + brillo diagonal */}
         <div className="grain pointer-events-none absolute inset-0 opacity-[0.14]" />
@@ -75,7 +75,7 @@ export function BankCard({ method }: { method: PaymentMethodDTO }) {
           style={{ background: 'rgba(255,255,255,0.08)', filter: 'blur(30px)' }}
         />
 
-        <div className="relative flex h-full flex-col justify-between">
+        <div className="relative flex flex-1 flex-col justify-between gap-3">
           {/* Marca + contactless */}
           <div className="flex items-start justify-between gap-3">
             <div style={{ color: fg }}>{theme.logo}</div>
@@ -87,7 +87,7 @@ export function BankCard({ method }: { method: PaymentMethodDTO }) {
             <Chip />
             {method.cardNumber ? (
               <div className="mt-2 flex items-center gap-2">
-                <p className="font-ticket text-lg font-bold tracking-[0.12em] sm:text-xl" style={emboss}>
+                <p className="min-w-0 break-all font-ticket text-lg font-bold tracking-[0.12em] sm:text-xl" style={emboss}>
                   {groupCard(method.cardNumber)}
                 </p>
                 <CopyPill value={method.cardNumber.replace(/\s+/g, '')} label="Tarjeta" fg={fg} />

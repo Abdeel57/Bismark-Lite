@@ -135,6 +135,7 @@ export interface RiferoProfileDTO {
   templateKey: string;
   logoScale: number;
   logoGlow: boolean;
+  publicDarkMode: boolean; // tema oscuro de la página pública (lo elige el rifero)
   payHolderName: string | null;
   payBank: string | null;
   payClabe: string | null;
@@ -174,6 +175,7 @@ export interface PublicRiferoDTO {
   templateKey: string;
   logoScale: number;
   logoGlow: boolean;
+  publicDarkMode: boolean; // tema oscuro de la página pública
   verified: boolean;
   faqs: FaqItemDTO[];
   raffles: PublicRaffleSummaryDTO[];
@@ -210,6 +212,8 @@ export interface RaffleDTO {
   allowWinnerPublication: boolean;
   useDigitalDraw: boolean;
   showCountdown: boolean; // mostrar la cuenta regresiva al sorteo
+  // Cuántas filas muestra la tabla de precios pública ("N boletos por $X"). Default 10.
+  priceListRows: number;
   // Oportunidades por boleto (1 = sin regalos). Emisiones totales = totalTickets * opportunities.
   opportunities: number;
   // Promociones de volumen: niveles por umbral y paquetes exactos (pueden ir vacíos).

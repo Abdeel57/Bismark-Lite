@@ -200,6 +200,7 @@ model RiferoProfile {
   templateKey    String  @default("classic")
   logoScale      Int     @default(100) // % del tamaño base del logo (50–250)
   logoGlow       Boolean @default(false) // halo de color detrás del logo (útil para PNG transparentes)
+  publicDarkMode Boolean @default(false) // tema oscuro de la página pública (lo elige el rifero en Apariencia)
 
   // Configuración de pagos (instrucciones manuales del rifero)
   payHolderName   String?
@@ -324,6 +325,8 @@ model Raffle {
   allowWinnerPublication Boolean @default(true)
   useDigitalDraw         Boolean @default(false)
   showCountdown          Boolean @default(true) // mostrar la cuenta regresiva al sorteo en la rifa pública
+  // Cuántas filas muestra la tabla de precios pública ("N boletos por $X"): de 1 a priceListRows.
+  priceListRows          Int     @default(10)
 
   // Oportunidades por boleto: por cada boleto manual elegido, el comprador recibe
   // (opportunities - 1) números de regalo del rango de emisiones extra. 1 = sin

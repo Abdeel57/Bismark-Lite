@@ -16,6 +16,7 @@ interface BrandProfile {
   description: string | null;
   logoUrl: string | null;
   coverUrl: string | null;
+  publicDarkMode: boolean;
 }
 
 let cache: { profile: BrandProfile | null; at: number } | null = null;
@@ -26,7 +27,7 @@ async function getSiteProfile(): Promise<BrandProfile | null> {
   if (cache && now - cache.at < TTL_MS) return cache.profile;
   const profile = await prisma.riferoProfile.findFirst({
     orderBy: { createdAt: 'asc' },
-    select: { publicName: true, description: true, logoUrl: true, coverUrl: true },
+    select: { publicName: true, description: true, logoUrl: true, coverUrl: true, publicDarkMode: true },
   });
   cache = { profile, at: now };
   return profile;
@@ -68,6 +69,21 @@ export async function renderBrandedIndex(rawHtml: string, request: FastifyReques
   const ogImage = absolute(profile.coverUrl || profile.logoUrl, request);
 
   let html = rawHtml;
+
+  // Tema oscuro de la página pública (lo elige el rifero). Se inyecta la clase
+  // `dark` en <html> ANTES de que cargue el JS para no parpadear (claro→oscuro).
+  // El administrador (/admin, /login) siempre va en claro: ahí no se inyecta.
+  const path = (request.url || '/').split('?')[0];
+  const isAdminRoute = path === '/login' || path === '/admin' || path.startsWith('/admin/');
+  if (profile.publicDarkMode && !isAdminRoute) {
+    html = html.replace(/<html(\s[^>]*)?>/i, (m, attrs: string | undefined) => {
+      const a = attrs ?? '';
+      return /class\s*=/.test(a)
+        ? `<html${a.replace(/class\s*=\s*"([^"]*)"/i, (_x, c: string) => `class="${c} dark"`)}>`
+        : `<html${a} class="dark">`;
+    });
+    html = setName(html, 'theme-color', '#0f172a');
+  }
 
   // Título de la pestaña → nombre de la página de rifas.
   html = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(name)}</title>`);

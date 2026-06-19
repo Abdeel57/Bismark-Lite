@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { PageLoader, Spinner } from '@/components/ui/misc';
 import { VerifiedBadge } from '@/components/brand/VerifiedBadge';
 import { RiferoTheme } from '@/components/brand/RiferoTheme';
@@ -31,6 +32,7 @@ interface DesignState {
   templateKey: string;
   logoScale: number;
   logoGlow: boolean;
+  publicDarkMode: boolean;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -129,6 +131,7 @@ export default function Design() {
     templateKey: 'classic',
     logoScale: 100,
     logoGlow: false,
+    publicDarkMode: false,
   });
   const [status, setStatus] = useState<SaveStatus>('idle');
   const initRef = useRef(false);
@@ -149,6 +152,7 @@ export default function Design() {
         templateKey: profile.templateKey || 'classic',
         logoScale: profile.logoScale ?? 100,
         logoGlow: profile.logoGlow ?? false,
+        publicDarkMode: profile.publicDarkMode ?? false,
       });
     }
   }, [profile]);
@@ -167,8 +171,12 @@ export default function Design() {
         templateKey: next.templateKey,
         logoScale: next.logoScale,
         logoGlow: next.logoGlow,
+        publicDarkMode: next.publicDarkMode,
       });
       queryClient.setQueryData(['rifero', 'me'], res);
+      // El tema de la página pública lo lee la query ['public-rifero']; invalidarla
+      // hace que el cambio de modo oscuro se refleje sin recargar.
+      void queryClient.invalidateQueries({ queryKey: ['public-rifero'] });
       pendingRef.current = null;
       if (!silent) {
         setStatus('saved');
@@ -371,6 +379,24 @@ export default function Design() {
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/30 px-4 py-3">
+            <div>
+              <Label className="text-sm font-medium">Modo oscuro</Label>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Define cómo ven tu página los visitantes. Apagado = fondo claro (blanco).
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="w-6 text-right text-xs font-bold tabular-nums text-muted-foreground">
+                {state.publicDarkMode ? 'Sí' : 'No'}
+              </span>
+              <Switch
+                aria-label="Modo oscuro de la página pública"
+                checked={state.publicDarkMode}
+                onCheckedChange={(v) => update({ publicDarkMode: v })}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

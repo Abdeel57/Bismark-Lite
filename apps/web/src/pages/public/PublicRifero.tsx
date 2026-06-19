@@ -346,9 +346,6 @@ export default function PublicRifero({ subdomain, previewData }: Props) {
                       </div>
                     )}
                   </div>
-                  {rifero.verified && (
-                    <VerifiedBadge size={30} className="absolute bottom-0.5 right-0.5 drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]" />
-                  )}
                 </div>
               </div>
 

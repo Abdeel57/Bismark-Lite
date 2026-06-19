@@ -1,42 +1,14 @@
-import { create } from 'zustand';
+// Tema activo de la app (single-tenant). El tema NO es una preferencia del
+// navegador ni del sistema: lo decide el contexto y lo aplica <ThemeController>.
+//   - Administrador (/admin, /login): siempre claro.
+//   - Páginas públicas: lo elige el rifero (publicDarkMode); por defecto claro.
+// La clase `dark` activa los tokens de color oscuros de index.css (darkMode:'class').
+const DARK_THEME_COLOR = '#0f172a';
+const LIGHT_THEME_COLOR = '#1d4ed8';
 
-type Theme = 'light' | 'dark';
-
-interface ThemeState {
-  theme: Theme;
-  toggle: () => void;
-  setTheme: (t: Theme) => void;
-}
-
-function getInitial(): Theme {
-  if (typeof window === 'undefined') return 'light';
-  const stored = localStorage.getItem('bsk-theme') as Theme | null;
-  if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function apply(theme: Theme): void {
-  const root = document.documentElement;
-  root.classList.toggle('dark', theme === 'dark');
-  localStorage.setItem('bsk-theme', theme);
+export function applyTheme(dark: boolean): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.toggle('dark', dark);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0f172a' : '#1d4ed8');
-}
-
-export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: getInitial(),
-  toggle: () => {
-    const next = get().theme === 'dark' ? 'light' : 'dark';
-    apply(next);
-    set({ theme: next });
-  },
-  setTheme: (t) => {
-    apply(t);
-    set({ theme: t });
-  },
-}));
-
-// Aplicar al cargar.
-if (typeof window !== 'undefined') {
-  apply(getInitial());
+  if (meta) meta.setAttribute('content', dark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR);
 }

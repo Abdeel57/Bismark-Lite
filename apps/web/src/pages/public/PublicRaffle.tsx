@@ -453,13 +453,13 @@ export default function PublicRaffle({ subdomain }: Props) {
             mejor oferta (paquetes/niveles) para esa cantidad. ── */}
         <div className="bg-zinc-950 py-5 text-white">
           <div className="mx-auto max-w-2xl px-4">
-            <div className="divide-y divide-white/10 overflow-hidden rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+            <div>
+              {Array.from({ length: raffle.priceListRows ?? 10 }, (_, i) => i + 1).map((n) => {
                 const row = computeOrderPrice(n, pricingCfg);
                 return (
                   <div
                     key={n}
-                    className="flex items-center justify-center gap-1.5 py-2.5 text-sm font-bold uppercase tracking-wide"
+                    className="flex items-center justify-center gap-1.5 py-1.5 text-sm font-bold uppercase tracking-wide"
                   >
                     <span className="text-[var(--rifero-primary)]">{n}</span>
                     <span>{n === 1 ? 'boleto por' : 'boletos por'}</span>

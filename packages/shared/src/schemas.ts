@@ -85,6 +85,7 @@ export const updateRiferoSchema = z.object({
   templateKey: z.string().max(40).optional(),
   logoScale: z.number().int().min(50).max(250).optional(), // % del tamaño base del logo
   logoGlow: z.boolean().optional(), // halo de color detrás del logo
+  publicDarkMode: z.boolean().optional(), // tema oscuro de la página pública
   payHolderName: z.string().max(120).optional(),
   payBank: z.string().max(80).optional(),
   payClabe: z.string().max(40).optional(),
@@ -137,6 +138,8 @@ const raffleBaseSchema = z.object({
   allowWinnerPublication: z.boolean().optional(),
   useDigitalDraw: z.boolean().optional(),
   showCountdown: z.boolean().optional(),
+  // Filas de la tabla de precios pública ("N boletos por $X"): 1…50. Default 10.
+  priceListRows: z.number().int().min(1, 'Mínimo 1').max(50, 'Máximo 50').optional(),
   // Promociones de volumen (opcionales): niveles por umbral y paquetes exactos.
   pricingTiers: z.array(priceTierSchema).max(12).optional(),
   pricingBundles: z.array(priceBundleSchema).max(12).optional(),

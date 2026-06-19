@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ArrowLeft, Ticket, Star, BadgeCheck } from 'lucide-react';
-import { ThemeToggle } from '@/components/brand/ThemeToggle';
 import { LogoMark } from '@/components/brand/LogoMark';
 
 interface Props {
@@ -101,7 +100,6 @@ export function AuthLayout({ children, badge, sideTitle, sideSubtitle, bullets, 
             >
               <ArrowLeft className="h-4 w-4" /> Inicio
             </Link>
-            <ThemeToggle />
           </div>
         </div>
 

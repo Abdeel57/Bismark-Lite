@@ -8,6 +8,7 @@ import { AdminDrawer } from '@/components/owner/AdminDrawer';
 import { RequireRifero, RequireGuest, RequireAdmin } from '@/components/RouteGuards';
 import { OfflineBanner } from '@/components/layout/OfflineBanner';
 import { InstallBanner } from '@/components/layout/InstallBanner';
+import { ThemeController } from '@/components/brand/ThemeController';
 
 // ── Páginas (lazy) ──────────────────────────────────────────
 const Login = lazy(() => import('@/pages/auth/Login'));
@@ -52,6 +53,7 @@ export function App() {
 
   return (
     <>
+      <ThemeController />
       <OfflineBanner />
       <Suspense fallback={<Fallback />}>
         <Routes>

@@ -39,7 +39,7 @@ const STEP_FIELDS: (keyof CreateRaffleInput)[][] = [
   ['title', 'prize', 'description'],
   ['ticketPrice', 'totalTickets', 'ticketFormat', 'ticketStart', 'opportunities', 'maxTicketsPerOrder'],
   [],
-  ['terms', 'paymentInstructions'],
+  ['terms', 'paymentInstructions', 'priceListRows'],
 ];
 
 function localToIso(local: string): string {
@@ -95,6 +95,7 @@ export default function RaffleForm() {
       allowWinnerPublication: true,
       useDigitalDraw: false,
       showCountdown: true,
+      priceListRows: 10,
       images: [],
     },
   });
@@ -124,6 +125,7 @@ export default function RaffleForm() {
       allowWinnerPublication: r.allowWinnerPublication,
       useDigitalDraw: r.useDigitalDraw,
       showCountdown: r.showCountdown,
+      priceListRows: r.priceListRows,
       images: r.images.map((img) => img.url),
     });
     setImages(r.images.map((img) => img.url));
@@ -542,6 +544,21 @@ export default function RaffleForm() {
                   onCheckedChange={(v) => setValue('showCountdown', v)}
                 />
               </div>
+              <Field
+                label="Filas de la tabla de precios"
+                htmlFor="priceListRows"
+                hint='La lista "N boletos por $X" llega hasta esta cantidad de boletos. Por defecto 10.'
+                error={errors.priceListRows?.message}
+              >
+                <Input
+                  id="priceListRows"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={50}
+                  {...register('priceListRows', { valueAsNumber: true })}
+                />
+              </Field>
               <Field
                 label="Términos y condiciones"
                 htmlFor="terms"

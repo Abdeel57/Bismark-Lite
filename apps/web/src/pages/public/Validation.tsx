@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Separator, Skeleton } from '@/components/ui/misc';
 import { OrderStatusBadge } from '@/lib/statusBadges';
 import { Logo } from '@/components/brand/Logo';
-import { ThemeToggle } from '@/components/brand/ThemeToggle';
 import { PoweredBy } from '@/components/brand/PoweredBy';
 
 export default function Validation() {
@@ -28,7 +27,6 @@ export default function Validation() {
           <Link to="/">
             <Logo />
           </Link>
-          <ThemeToggle />
         </div>
       </header>
 

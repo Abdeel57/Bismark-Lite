@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { BrandLoader } from '@/components/brand/BrandLoader';
 import { OrderStatusBadge } from '@/lib/statusBadges';
 import { Logo } from '@/components/brand/Logo';
-import { ThemeToggle } from '@/components/brand/ThemeToggle';
 import { QrCode } from '@/components/public/QrCode';
 import { PaymentSection } from '@/components/public/PaymentSection';
 import { useOfflineTicket } from '@/lib/offline/useOfflineTicket';
@@ -40,7 +39,6 @@ export default function DigitalTicket() {
           <Link to="/">
             <Logo />
           </Link>
-          <ThemeToggle />
         </div>
       </header>
 

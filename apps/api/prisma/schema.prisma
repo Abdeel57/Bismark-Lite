@@ -555,3 +555,17 @@ model ActivityLog {
   @@index([type])
   @@index([createdAt])
 }
+
+// ─────────────────────────────────────────────────────────────
+// STORED ASSETS (imágenes/comprobantes guardados en la BD)
+// ─────────────────────────────────────────────────────────────
+// Binarios guardados en Postgres para que SOBREVIVAN a los deploys de Railway
+// (el disco del contenedor es efímero y se borra en cada despliegue). La `key`
+// coincide con la URL pública /uploads/<key>. Se activa con STORAGE_DRIVER=db.
+model StoredAsset {
+  key       String   @id
+  mime      String
+  bytes     Bytes
+  size      Int
+  createdAt DateTime @default(now())
+}

@@ -91,7 +91,7 @@ export const env = {
   },
 
   storage: {
-    driver: (process.env.STORAGE_DRIVER ?? 'local') as 'local' | 'cloudinary' | 's3',
+    driver: (process.env.STORAGE_DRIVER ?? 'local') as 'local' | 'db' | 'cloudinary' | 's3',
     localDir: str('LOCAL_UPLOAD_DIR', './uploads'),
     cloudinary: {
       cloudName: process.env.CLOUDINARY_CLOUD_NAME ?? '',

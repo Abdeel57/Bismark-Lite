@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { env } from './config/env.js';
+import { prisma } from './lib/prisma.js';
 import { SESSION_COOKIE } from './lib/auth.js';
 import { isAllowedOrigin } from './lib/origins.js';
 import { renderBrandedIndex } from './lib/site-html.js';
@@ -84,14 +85,30 @@ export async function buildApp(): Promise<FastifyInstance> {
     throwFileSizeLimit: false, // no lanza; marca file.truncated para devolver error amigable
   });
 
-  // Servir archivos subidos en modo local (dev).
+  // Servir archivos subidos.
   if (env.storage.driver === 'local') {
+    // Modo local (dev): disco + @fastify/static.
     const uploadsRoot = resolve(env.storage.localDir);
     mkdirSync(uploadsRoot, { recursive: true }); // @fastify/static requiere que exista al registrar
     await app.register(fastifyStatic, {
       root: uploadsRoot,
       prefix: '/uploads/',
       decorateReply: false,
+    });
+  } else if (env.storage.driver === 'db') {
+    // Modo BD (Railway): las imágenes viven en Postgres y sobreviven a los deploys.
+    // Caché agresivo: la `key` es aleatoria, así que el contenido es inmutable.
+    app.get('/uploads/*', async (request, reply) => {
+      const key = (request.params as Record<string, string>)['*'];
+      const asset = await prisma.storedAsset.findUnique({ where: { key } });
+      if (!asset) {
+        return reply.code(404).send({ error: 'not_found', message: 'Imagen no encontrada' });
+      }
+      return reply
+        .header('Content-Type', asset.mime)
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .header('Cross-Origin-Resource-Policy', 'cross-origin')
+        .send(asset.bytes);
     });
   }
 

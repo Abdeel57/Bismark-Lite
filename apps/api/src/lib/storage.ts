@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { env } from '../config/env.js';
+import { prisma } from './prisma.js';
 
 export interface StoredFile {
   url: string;
@@ -39,6 +40,23 @@ class LocalStorage implements StorageAdapter {
   }
 }
 
+// ── Base de datos (Postgres) ────────────────────────────────
+// Guarda el binario en la tabla StoredAsset para que sobreviva a los deploys de
+// Railway (el disco del contenedor es efímero). Se sirve vía GET /uploads/<key>
+// (ver app.ts). Pensado para los volúmenes pequeños de esta app (logo, banner,
+// imágenes de premio y comprobantes).
+class DbStorage implements StorageAdapter {
+  async upload(input: UploadInput): Promise<StoredFile> {
+    const folder = input.folder ?? 'misc';
+    const name = safeName(input.filename);
+    const key = `${folder}/${name}`;
+    await prisma.storedAsset.create({
+      data: { key, mime: input.mimetype, bytes: input.buffer, size: input.buffer.byteLength },
+    });
+    return { key, url: `/uploads/${key}` };
+  }
+}
+
 // ── Cloudinary (placeholder configurable) ───────────────────
 // Para activar: instalar `cloudinary` y completar credenciales en .env.
 // Se deja preparado sin acoplar la dependencia al build base.
@@ -64,6 +82,8 @@ class S3Storage implements StorageAdapter {
 
 function buildStorage(): StorageAdapter {
   switch (env.storage.driver) {
+    case 'db':
+      return new DbStorage();
     case 'cloudinary':
       return new CloudinaryStorage();
     case 's3':
